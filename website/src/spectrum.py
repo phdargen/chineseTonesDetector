@@ -85,7 +85,12 @@ def get_spectrum():
     print(f"Predictions: {predictions}")
     print(f"The highest prediction is for tone: {highest_index+1}")
 
-    return jsonify({"spectrum": img_base64})
+    response_data = {
+        "spectrum": img_base64,
+        "prediction": int(highest_index)+1  
+    }
+
+    return jsonify(response_data)
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -11,6 +11,7 @@ const VoiceRecordingButton = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState(0);
   const [spectrumImage, setSpectrumImage] = useState(null);
+  const [prediction, setPrediction] = useState(null);
 
   useEffect(() => {
     let interval;
@@ -66,6 +67,7 @@ const VoiceRecordingButton = () => {
       if (response.ok) {
         const data = await response.json();
         setSpectrumImage(data.spectrum);
+        setPrediction(data.prediction);
       } else {
         console.error('Failed to fetch spectrum data.');
       }
@@ -88,34 +90,42 @@ const VoiceRecordingButton = () => {
     height: '20px', 
   };
 
-  return (
-    <div>
-      <button onClick={startRecording} disabled={isRecording}>
-        Start Recording
-      </button>
-      {isRecording ? (
-        <button onClick={stopRecording}>Stop Recording</button>
-      ) : (
-        audioBlob && (
-          <div>
-            <p>Recorded Audio:</p>
-            <AudioPlayer src={URL.createObjectURL(audioBlob)} controls />
-            <button onClick={replayAudio}>Replay Audio</button>
-          </div>
-        )
-      )}
-      {isRecording && (
+// ...
+
+return (
+  <div>
+    <button onClick={startRecording} disabled={isRecording}>
+      Start Recording
+    </button>
+    {isRecording ? (
+      <button onClick={stopRecording}>Stop Recording</button>
+    ) : (
+      audioBlob && (
         <div>
-          <p>Recording Time: {recordedTime} seconds</p>
+          <p>Recorded Audio:</p>
+          <AudioPlayer src={URL.createObjectURL(audioBlob)} controls />
+          <button onClick={replayAudio}>Replay Audio</button>
         </div>
-      )}
-      {spectrumImage && (
-        <div>
-          <img src={`data:image/png;base64,${spectrumImage}`} alt="Spectrum" />
-        </div>
-      )}
-    </div>
-  );
+      )
+    )}
+    {isRecording && (
+      <div>
+        <p>Recording Time: {recordedTime} seconds</p>
+      </div>
+    )}
+    {spectrumImage && (
+      <div>
+        <img src={`data:image/png;base64,${spectrumImage}`} alt="Spectrum" />
+        {prediction !== null ? (
+          <p>Prediction: Tone {prediction}</p>
+        ) : (
+          <p>No prediction available</p>
+        )}
+      </div>
+    )}
+  </div>
+);
+          
 };
 
 export default VoiceRecordingButton;
