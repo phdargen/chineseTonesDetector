@@ -3,7 +3,7 @@ import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
 
 // Maximum recording time in seconds
-const MAX_RECORDING_TIME = 2; 
+const MAX_RECORDING_TIME = 1; 
 
 const VoiceRecordingButton = () => {
   const [recorder, setRecorder] = useState(null);
