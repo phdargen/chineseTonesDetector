@@ -31,6 +31,8 @@ npx create-react-app website
 npm install recordrtc react-audio-player
 pip install librosa Flask flask-cors pydub
 brew install ffmpeg
+npm install react-router-dom
+npm install @mui/material @emotion/react @emotion/styled
 ```
 
 ### run
