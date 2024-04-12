@@ -23,21 +23,31 @@ cd prepareData
 analyzeTones.ipynb
 ```
 
+## ML API
+
+### setup environment
+```sh
+pip install librosa Flask flask-cors pydub
+(brew install ffmpeg)
+```
+
+### run
+```sh
+cd flaskAPI
+python spectrum.py
+```
+
 ## Website
 
 ### setup environment
 ```sh
 npx create-react-app website
-npm install recordrtc react-audio-player
-pip install librosa Flask flask-cors pydub
-brew install ffmpeg
-npm install react-router-dom
+npm install recordrtc react-audio-player react-router-dom
 npm install @mui/material @emotion/react @emotion/styled
 ```
 
 ### run
 ```sh
-cd website
+cd frontend
 npm start
-python src/spectrum.py
 ```
