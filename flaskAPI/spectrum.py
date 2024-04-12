@@ -2,20 +2,17 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS  
 import librosa.display
 import numpy as np
-import io
 import base64
 import matplotlib
 matplotlib.use('Agg')  # (non-interactive)
 import matplotlib.pyplot as plt
-from scipy import signal
 from pydub import AudioSegment
-from pydub.playback import play
-import subprocess
 import tensorflow as tf
 
 app = Flask(__name__)
-CORS(app, resources={r"/get_spectrum": {"origins": "http://localhost:3000"}}) 
-#CORS(app)
+CORS(app, resources={
+    r"/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]}
+})
 
 # load tf model   
 model = tf.keras.models.load_model('../prepareData/tfModelTones')
