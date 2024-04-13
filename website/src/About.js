@@ -4,7 +4,7 @@ const About = () => {
   const [aboutText, setAboutText] = useState('');
 
   useEffect(() => {
-    fetch('https://flask-test-nu-one.vercel.app/about')  
+    fetch('https://chinese-tones-detector-ml-api.vercel.app/about')  
       .then(response => response.text())
       .then(text => setAboutText(text))
       .catch(err => console.error('Failed to fetch About data:', err));

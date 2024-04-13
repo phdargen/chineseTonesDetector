@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
 
+// API
+const api_url = "https://chinese-tones-detector-ml-api.vercel.app"
+//const api_url = 'http://localhost:5000/get_spectrum'
+
 // Maximum recording time in seconds
 const MAX_RECORDING_TIME = 1; 
 
@@ -59,7 +63,7 @@ const VoiceRecordingButton = () => {
       const formData = new FormData();
       formData.append('audio', audioData); 
   
-      const response = await fetch('http://localhost:5000/get_spectrum', {
+      const response = await fetch(api_url, {
         method: 'POST',
         body: formData,
       });

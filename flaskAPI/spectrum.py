@@ -11,9 +11,9 @@ import tensorflow as tf
 
 app = Flask(__name__)
 CORS(app, resources={
-    r"/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]}
+    r"/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/about": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]}
 })
-
 
 # load tf model   
 model = tf.keras.models.load_model('../prepareData/tfModelTones')
@@ -24,6 +24,14 @@ def load_and_preprocess_image(file_path):
     #img = datagen.random_transform(img)
     img = img / 255.0
     return img
+
+@app.route('/')
+def home():
+    return 'Hello, World!'
+
+@app.route('/about')
+def about():
+    return 'About'
 
 @app.route("/get_spectrum", methods=["POST"])
 def get_spectrum():
