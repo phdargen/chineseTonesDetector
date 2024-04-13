@@ -14,6 +14,7 @@ CORS(app, resources={
     r"/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]}
 })
 
+
 # load tf model   
 model = tf.keras.models.load_model('../prepareData/tfModelTones')
 
