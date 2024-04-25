@@ -1,14 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Paper, Typography } from '@mui/material';
 
-const baseUrl = 'http://localhost:4000/sounds/';
-
 const speakers = ["MV1", "MV2", "MV3", "FV1", "FV2"];
 function getNewSpeaker(speakers, currentSpeaker) {
   // Filter out the current speaker from the speakers array
   const filteredSpeakers = speakers.filter(speaker => speaker !== currentSpeaker);
   const randomIndex = Math.floor(Math.random() * filteredSpeakers.length);
   return filteredSpeakers[randomIndex];
+}
+
+// API
+const api_url = 'http://localhost:5000/api/'
+async function fetchUrl(newFileUrl) {
+  try {
+      // Fetch URL 
+      const apiUrl = api_url+`get_file_access?filename=${encodeURIComponent(newFileUrl)}`;
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      if (response.ok) {
+          console.log('New URL: ', data.url);
+          return data.url;
+      } else {
+          console.error('Failed to fetch presigned URL:', data.error);
+          return null;
+      }
+  } catch (error) {
+      console.error('Error fetching presigned URL:', error);
+      return null;
+  }
 }
 
 function Listening() {
@@ -26,7 +46,7 @@ function Listening() {
   const playRandomSound = () => {
     setIsPlaying(true);
     setSelectedTone(null);
-    fetch('http://localhost:4000/api/random-sound')
+    fetch(api_url+'random-sound')
       .then(response => {
         if (!response.ok) {
           throw new Error('Network response was not ok');
@@ -46,7 +66,7 @@ function Listening() {
       });
   };
 
-  const handlePlayTone = (newTone) => {
+  const handlePlayTone = async (newTone) => {
     if (!currentFile) {
       console.error("No audio file loaded");
       return;
@@ -65,18 +85,23 @@ function Listening() {
       const [fullMatch, sound, tone, speaker] = match;
 
       // Construct URL with new tone
-      const newFileUrl = `${baseUrl}${sound}${newTone}_${speaker}_MP3.mp3`; 
-      console.log('newFileUrl ', newFileUrl);
-
-      audioPlayer.src = newFileUrl;
-      audioPlayer.load();
-      audioPlayer.play().catch(e => console.error("Error playing tone:", e));
+      const newFileName = `${sound}${newTone}_${speaker}_MP3.mp3`; 
+      console.log('newFileName ', newFileName);
+      const newFileUrl = await fetchUrl(newFileName);
+      if (newFileUrl) {
+        console.log('newFileUrl ', newFileUrl);
+        audioPlayer.src = newFileUrl;
+        audioPlayer.load();  
+        audioPlayer.play().catch(e => console.error("Error playing tone:", e));
+      } else {
+        console.log('Failed to load URL');
+      }
     } else {
       console.error("Failed to parse current file URL:", currentFile);
     }
   };
 
-  const handleDifferentSpeaker = () => {
+  const handleDifferentSpeaker = async () => {
     if (!currentFile) {
       console.error("No audio file loaded");
       return;
@@ -96,11 +121,16 @@ function Listening() {
       const newSpeaker = getNewSpeaker(speakers, speaker);
 
       // Construct URL with new speaker
-      const newFileUrl = `${baseUrl}${sound}${tone}_${newSpeaker}_MP3.mp3`; 
-      console.log('newFileUrl ', newFileUrl);
-
-      audioPlayer.src = newFileUrl;
-      audioPlayer.load();
+      const newFileName = `${sound}${tone}_${newSpeaker}_MP3.mp3`; 
+      console.log('newFileName ', newFileName);
+      const newFileUrl = await fetchUrl(newFileName);
+      if (newFileUrl) {
+        console.log('newFileUrl ', newFileUrl);
+        audioPlayer.src = newFileUrl;
+        audioPlayer.load();  
+      } else {
+        console.log('Failed to load URL');
+      }
 
       var success = true;
       audioPlayer.play().catch(e => { 
@@ -150,7 +180,7 @@ function Listening() {
 
   return (
     <div className="listening">
-      <Typography variant="h1">Listen</Typography>
+      <Typography variant="h1">Listening</Typography>
       <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying}>
         Next Word
       </Button>
@@ -164,7 +194,7 @@ function Listening() {
 
         <Box mb={2}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-            <Typography variant="h6">Word: {soundInfo.sound}</Typography>
+            <Typography variant="h6"> {soundInfo.sound}</Typography>
             {/* <Typography variant="h6">Tone: {soundInfo.tone}</Typography> */}
             {/* <Typography variant="h6">Speaker: {soundInfo.speaker}</Typography> */}
 
@@ -174,7 +204,7 @@ function Listening() {
                 <Button
                     key={tone}
                     onClick={() => handleToneSelection(tone)}
-                    disabled={selectedTone !== null}
+                    disabled={selectedTone !== null || currentFile === null}
                     sx={{
                       bgcolor: 'primary',  
                       color: 'primary',  

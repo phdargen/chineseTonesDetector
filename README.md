@@ -6,9 +6,8 @@
 ```sh
 conda create --name chineseTones_env python=3.8
 conda activate chineseTones_env
-pip install requests
 pip install jupyter 
-pip install numpy matplotlib librosa pandas seaborn tensorflow
+pip install requests numpy matplotlib librosa pandas seaborn tensorflow boto3
 ```
 
 ### download data samples
@@ -51,3 +50,12 @@ npm install @mui/material @emotion/react @emotion/styled
 cd frontend
 npm start
 ```
+
+
+## AWS
+
+###
+export AWS_ACCESS_KEY_ID="your_access_key"
+export AWS_SECRET_ACCESS_KEY="your_secret_key"
+export AWS_DEFAULT_REGION="your_region"
+

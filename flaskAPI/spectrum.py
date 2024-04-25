@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS  
 import librosa.display
 import numpy as np
@@ -9,11 +9,21 @@ import matplotlib.pyplot as plt
 from pydub import AudioSegment
 import tensorflow as tf
 
+import boto3
+import random
+import re
+
 app = Flask(__name__)
 CORS(app, resources={
-    r"/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
-    r"/about": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]}
+    r"/api/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/about": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/random-sound": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/get_file_access": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
 })
+
+# AWS S3 setup
+s3_client = boto3.client('s3')
+bucket_name = 'chinesetonesdata'
 
 # load tf model   
 model = tf.keras.models.load_model('../prepareData/tfModelTones')
@@ -27,24 +37,28 @@ def load_and_preprocess_image(file_path):
 
 @app.route('/')
 def home():
-    return 'Hello, World!'
+    return 'Server is running and serving files from AWS S3'
 
-@app.route('/about')
+@app.route('/api/about')
 def about():
     return 'About'
 
-@app.route("/get_spectrum", methods=["POST"])
+@app.route("/api/get_spectrum", methods=["POST"])
 def get_spectrum():
-    
     try:
         audio_data = request.files["audio"]
-        
-        # Convert audio from webm to wav format
-        audio = AudioSegment.from_file(audio_data, format="webm")
+        audio_format = audio_data.content_type.split('/')[-1]  
+
+        print(f"audio_data: {str(audio_data)}")
+        print(f"audio_format: {str(audio_format)}")
+
+        # Convert audio from webm/mp3 to wav format
+        audio = AudioSegment.from_file(audio_data, format="mp3" if audio_format == "mpeg" or audio_format == "mp3" else "webm")
         wav_audio = audio.set_frame_rate(44100)  
         wav_audio.export("temp_audio.wav", format="wav")
         
         # Process audio
+        #audio, sr = librosa.load(audio_data)
         audio, sr = librosa.load("temp_audio.wav")
         audio, index = librosa.effects.trim(audio, top_db=30, ref=np.max, frame_length=2048, hop_length=512)
 
@@ -97,6 +111,65 @@ def get_spectrum():
     }
 
     return jsonify(response_data)
+
+@app.route('/api/random-sound')
+def random_sound():
+    try:
+        # Retrieve list of files in the bucket
+        response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix='raw_data/')
+        files = [item['Key'] for item in response.get('Contents', []) if item['Key'].endswith('.mp3')]
+
+        if not files:
+            abort(404, 'No valid sound files found')
+
+        # Select a random file
+        selected_file_key = random.choice(files)
+        file_name = selected_file_key.split('/')[-1]
+
+        # Extract sound, tone, speaker from file name
+        match = re.match(r'(\w+)(\d+)_(\w+)_MP3\.mp3', file_name)
+        if match:
+            sound, tone, speaker = match.groups()
+            # Generate a pre-signed URL for temporary access
+            url = s3_client.generate_presigned_url('get_object',
+                                                   Params={'Bucket': bucket_name, 'Key': selected_file_key},
+                                                   ExpiresIn=3600)  # URL expires in 1 hour
+            
+            print(url)
+
+            return jsonify({
+                "sound": sound,
+                "tone": tone,
+                "speaker": speaker,
+                "url": url
+            })
+        else:
+            abort(404, 'Failed to parse the selected sound file')
+
+    except Exception as e:
+        print(f"Error accessing AWS S3: {str(e)}")
+        abort(500, str(e))
+
+@app.route('/api/get_file_access')
+def get_file_access():
+    # Retrieve the filename from query parameters
+    filename = request.args.get('filename')
+    if not filename:
+        return jsonify({'error': 'Filename parameter is required'}), 400
+
+    try:
+        file_key = f'raw_data/{filename}'
+
+        # Generate a presigned URL for the requested file
+        presigned_url = s3_client.generate_presigned_url('get_object',
+                                                         Params={'Bucket': bucket_name, 'Key': file_key},
+                                                         ExpiresIn=3600)  # URL expires in 1 hour
+
+        return jsonify({'file_name': filename, 'url': presigned_url})
+
+    except Exception as e:
+        print(f"Error generating presigned URL: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

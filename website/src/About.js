@@ -10,7 +10,7 @@ const About = () => {
       .catch(err => console.error('Failed to fetch About data:', err));
   }, []);
 
-  return <h1>{aboutText || 'Loading...'}</h1>;
+  return <h1>{aboutText || 'About'}</h1>;
 };
 
 export default About;

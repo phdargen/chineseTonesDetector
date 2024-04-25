@@ -1,15 +1,82 @@
 import React, { useState, useEffect } from 'react';
 import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
+import { Box, Button, Paper, Typography } from '@mui/material';
 
 // API
-const api_url = "https://chinese-tones-detector-ml-api.vercel.app"
-//const api_url = 'http://localhost:5000/get_spectrum'
+const api_url = 'http://localhost:5000/api/'
 
 // Maximum recording time in seconds
 const MAX_RECORDING_TIME = 1; 
 
 const VoiceRecordingButton = () => {
+
+  // Get example word to speak
+  const [currentFile, setCurrentFile] = useState(null);
+  const [soundInfo, setSoundInfo] = useState({ sound: '', tone: '', speaker: '' });
+  const [audioPlayer, setAudioPlayer] = useState(new Audio());
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [statistics, setStatistics] = useState({ correct: 0, total: 0 });
+  const [soundBlob, setSoundBlob] = useState(null);
+
+  useEffect(() => {
+    return () => audioPlayer.pause();
+  }, [audioPlayer]);
+
+  const playRandomSound = () => {
+    setIsPlaying(true);
+    setSpectrumImage(null);
+    setPrediction(null);
+    setSoundBlob(null);
+  
+    fetch(api_url+'random-sound')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        const { sound, tone, speaker, url } = data;
+        setSoundInfo({ sound, tone, speaker });
+        setCurrentFile(url);
+        audioPlayer.src = url;
+        audioPlayer.play().catch(e => console.error("Error playing audio:", e));
+  
+        // Fetch the audio blob from the URL provided by the API
+        return fetch(url);  // This fetches the audio file as a response stream
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch audio blob for spectrum analysis');
+        }
+        return response.blob();  // Convert the response stream to a Blob
+      })
+      .then(blob => {
+        setSoundBlob(blob);  // Save the blob if needed for other purposes
+        //fetchSpectrum(blob);  // Now we call fetchSpectrum with the Blob
+      })
+      .catch(error => {
+        console.error('Error fetching or playing sound:', error);
+        setIsPlaying(false);
+      });
+  };  
+
+  const replaySound = () => {
+
+    if (audioPlayer.src) {
+      audioPlayer.currentTime = 0; 
+      if(audioPlayer.src !== currentFile ){
+        audioPlayer.src = currentFile;
+        audioPlayer.load();
+      }
+      audioPlayer.play().catch(e => console.error("Error replaying audio:", e));
+
+      fetchSpectrum(soundBlob);
+    }
+  };
+
+  // Record speaking
   const [recorder, setRecorder] = useState(null);
   const [audioBlob, setAudioBlob] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -62,8 +129,10 @@ const VoiceRecordingButton = () => {
     try {
       const formData = new FormData();
       formData.append('audio', audioData); 
-  
-      const response = await fetch(api_url, {
+      console.log('audioData ', audioData)
+      console.log('formData ', formData)
+
+      const response = await fetch(api_url+"get_spectrum", {
         method: 'POST',
         body: formData,
       });
@@ -94,39 +163,53 @@ const VoiceRecordingButton = () => {
     height: '20px', 
   };
 
-// ...
+  const getPredictionColor = () => {
+    if( String(prediction) === soundInfo.tone ) return "green";
+    return "red";
+  };
 
 return (
   <div>
-    <button onClick={startRecording} disabled={isRecording}>
+    <Typography variant="h1">Speaking</Typography>
+
+    <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying && prediction === null}>
+        Next Word
+    </Button>
+    <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile}>
+        Play
+    </Button>
+    
+    <Box mb={2}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+            <Typography variant="h6"> Word: {soundInfo.sound} </Typography>
+            <Typography variant="h6"> Tone: {soundInfo.tone} </Typography>
+    </Paper>
+    </Box>
+
+    <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording}>
       Start Recording
-    </button>
-    {isRecording ? (
-      <button onClick={stopRecording}>Stop Recording</button>
-    ) : (
-      audioBlob && (
-        <div>
-          <p>Recorded Audio:</p>
-          <AudioPlayer src={URL.createObjectURL(audioBlob)} controls />
-          <button onClick={replayAudio}>Replay Audio</button>
-        </div>
-      )
-    )}
-    {isRecording && (
-      <div>
-        <p>Recording Time: {recordedTime} seconds</p>
-      </div>
-    )}
+    </Button>
+    {/* <Button variant="contained" color="primary" onClick={stopRecording} disabled={!isRecording}>Stop Recording</Button> */}
+
+    <Box mb={2}>
+    <Paper elevation={3} style={{ padding: '16px' }}>
+      {audioBlob && (
+          <div>
+            <AudioPlayer src={URL.createObjectURL(audioBlob)} controls />
+          </div>
+      )}
+
+      { prediction && <Typography variant="h6" color={getPredictionColor()} > Prediction: Tone {prediction} </Typography> }
+
+    </Paper>
+    </Box>
+
     {spectrumImage && (
-      <div>
-        <img src={`data:image/png;base64,${spectrumImage}`} alt="Spectrum" />
-        {prediction !== null ? (
-          <p>Prediction: Tone {prediction}</p>
-        ) : (
-          <p>No prediction available</p>
-        )}
-      </div>
-    )}
+        <div>
+          <img src={`data:image/png;base64,${spectrumImage}`} alt="Spectrum" />
+        </div>
+      )}
+
   </div>
 );
           

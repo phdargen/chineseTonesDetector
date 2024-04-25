@@ -6,11 +6,11 @@ import { Drawer, Box, Typography } from '@mui/material';
 function Sidebar() {
   return (
     <div className="sidebar">
-      <Typography variant="h4">Chinese Tones</Typography>
+      <Typography variant="h2">Pingulino</Typography>
 
       <Box sx={{ padding: '16px' }}>
         <img 
-          src="logo.png" 
+          src="pingulino2.png" 
           style={{ width: '100%', marginBottom: '16px' }}
         />
       </Box>
