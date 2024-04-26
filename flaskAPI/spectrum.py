@@ -105,8 +105,6 @@ def get_spectrum():
     print(f"Predictions: {predictions}")
     print(f"The highest prediction is for tone: {highest_index+1}")
 
-    print(f"img_base64: {str(img_base64)}")
-
     response_data = {
         "spectrum": img_base64,
         "prediction": int(highest_index)+1  
