@@ -9,6 +9,8 @@ import VoiceRecordingButton from './VoiceRecordingButton';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 
+import { Analytics } from "@vercel/analytics/react"
+
 const theme = createTheme({
   palette: {
     primary: {
@@ -25,17 +27,11 @@ const theme = createTheme({
     },
   },
 });
-// function App() {
-//   return (
-//     <div className="App">
-//       <h1>Check my tones</h1>
-//       <VoiceRecordingButton />
-//     </div>
-//   );
-// }
 
 function App() {
   return (
+    <>
+    <Analytics/>
     <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>
@@ -52,6 +48,7 @@ function App() {
           </div>
         </Router>
     </ThemeProvider>
+    </>
   );
 }
 

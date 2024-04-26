@@ -15,10 +15,10 @@ import re
 
 app = Flask(__name__)
 CORS(app, resources={
-    r"/api/get_spectrum": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
-    r"/api/about": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
-    r"/api/random-sound": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
-    r"/api/get_file_access": {"origins": ["http://localhost:3000/*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/get_spectrum": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/about": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/random-sound": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/get_file_access": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
 })
 
 # AWS S3 setup
@@ -105,6 +105,8 @@ def get_spectrum():
     print(f"Predictions: {predictions}")
     print(f"The highest prediction is for tone: {highest_index+1}")
 
+    print(f"img_base64: {str(img_base64)}")
+
     response_data = {
         "spectrum": img_base64,
         "prediction": int(highest_index)+1  
@@ -172,4 +174,6 @@ def get_file_access():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    #app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
+
