@@ -213,7 +213,7 @@ return (
           </div>
       )}
 
-      { prediction && <Typography variant="h6" color={getPredictionColor()} > Prediction: {convertToPinyin(soundInfo.sound,prediction)} (Tone {prediction}) </Typography> }
+      { prediction && <Typography variant="h6" fontWeight='bold' color={getPredictionColor()} > Prediction: {convertToPinyin(soundInfo.sound,prediction)} (Tone {prediction}) </Typography> }
 
     </Paper>
     </Box>
