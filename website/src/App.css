@@ -1,18 +1,33 @@
 .app-container {
   display: flex;
+  height: 100vh;
 }
 
 .sidebar {
-  width: 25%;
+  width: 20%;
   background-color: #3f51b5;
-  color: #f1d9bd;
-  padding: 20px;
+  color: #fdf8f2;
+  padding: 0px;
   height: 100vh;
+  background-image: linear-gradient(to bottom, #3f51b5, #5a55ae);   
+  box-sizing: border-box;
 }
 
+.listItemButton {
+  padding: 4px 0; 
+  margin: 4px 0;
+}
+
+
 .content {
-  width: 80%;
-  padding: 20px;
+  width: 100%;
+  padding-top: 0px;
+  padding-bottom: 10px;
+  padding-left: 0px;
+  padding-right: 0px;
   overflow-y: auto;
-  height: 100vh;
+  background-color: #353537; 
+  /* background-image: radial-gradient(circle at left, #3f51b5, #fdf8f2);  */
+  /* background-image: linear-gradient(to right, #3f51b5, #fdf8f2);   */
+  /* height: 100vh; */
 }

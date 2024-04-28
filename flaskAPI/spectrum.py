@@ -45,6 +45,8 @@ def about():
 
 @app.route("/api/get_spectrum", methods=["POST"])
 def get_spectrum():
+    app.logger.debug('Headers: %s', request.headers)
+    app.logger.debug('Body: %s', request.data)
     try:
         audio_data = request.files["audio"]
         audio_format = audio_data.content_type.split('/')[-1]  

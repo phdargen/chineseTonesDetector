@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Listening from './Listening';
 import About from './About';
 import VoiceRecordingButton from './VoiceRecordingButton';
+import Header from './Header'; 
 
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
@@ -38,6 +39,7 @@ function App() {
           <div className="app-container">
             <Sidebar />
             <div className="content">
+              <Header />
               <Routes>
                 <Route path="/listening" element={ <Listening/>} />
                 <Route path="/speaking" element={ <VoiceRecordingButton/>} />

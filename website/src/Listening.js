@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Paper, Typography } from '@mui/material';
+import { useTheme, useMediaQuery } from '@mui/material';
+
+import ChangeCircleRoundedIcon from '@mui/icons-material/ChangeCircleRounded';
+import ReplayCircleFilledRoundedIcon from '@mui/icons-material/ReplayCircleFilledRounded';
+import PlayCircleFilledRoundedIcon from '@mui/icons-material/PlayCircleFilledRounded';
+
+const convertToPinyin = require('./convertToPinyin');
 
 const speakers = ["MV1", "MV2", "MV3", "FV1", "FV2"];
 function getNewSpeaker(speakers, currentSpeaker) {
@@ -11,6 +18,7 @@ function getNewSpeaker(speakers, currentSpeaker) {
 
 // API
 // const api_url = 'http://localhost:5000/api/'
+//const api_url = 'http://ec2-18-117-255-194.us-east-2.compute.amazonaws.com:5000/api/'
 const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 async function fetchUrl(newFileUrl) {
@@ -34,6 +42,10 @@ async function fetchUrl(newFileUrl) {
 }
 
 function Listening() {
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [currentFile, setCurrentFile] = useState(null);
   const [soundInfo, setSoundInfo] = useState({ sound: '', tone: '', speaker: '' });
   const [audioPlayer, setAudioPlayer] = useState(new Audio());
@@ -181,27 +193,26 @@ function Listening() {
   };
 
   return (
-    <div className="listening">
-      <Typography variant="h1">Listening</Typography>
-      <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying}>
-        Next Word
+    <div className="listening" style={{ padding: isMobile ? '10px' : '20px', margin: isMobile ? '10px' : '20px', justifyContent: 'center', alignItems: 'center'  }}>
+      {/* <Typography variant="h1">Listening</Typography> */}
+      <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying} startIcon={<PlayCircleFilledRoundedIcon />}>
+        Next 
       </Button>
-      <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile}>
+      <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile} startIcon={<ReplayCircleFilledRoundedIcon />}>
         Replay
-      </Button>
-      <Button variant="contained" color="primary" onClick={handleDifferentSpeaker} disabled={!currentFile}>
-        Change Speaker
       </Button>
       <div>
 
-        <Box mb={2}>
+        <Box mb={2} width={isMobile ? '100%' : '50%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-            <Typography variant="h6"> {soundInfo.sound}</Typography>
+            <Typography variant="h6" fontWeight='bold'> {soundInfo.sound}</Typography>
             {/* <Typography variant="h6">Tone: {soundInfo.tone}</Typography> */}
             {/* <Typography variant="h6">Speaker: {soundInfo.speaker}</Typography> */}
 
+            <Typography variant="h6">Select Tone: </Typography>
+
             <Typography variant="h6">
-              Select Tone: {' '}
+              {' '}
               {['1', '2', '3', '4'].map(tone => (
                 <Button
                     key={tone}
@@ -209,7 +220,8 @@ function Listening() {
                     disabled={selectedTone !== null || currentFile === null}
                     sx={{
                       bgcolor: 'primary',  
-                      color: 'primary',  
+                      color: 'primary',
+                      textTransform: 'none',  
                       ':hover': {
                         bgcolor: 'primary',  
                       },
@@ -219,28 +231,39 @@ function Listening() {
                       }
                     }}
                   >
-                    Tone {tone}
-                  </Button>
+                    <Typography variant="h6" component="span" style={{fontWeight: 'bold'}}>
+                      {convertToPinyin(soundInfo.sound, tone)}
+                    </Typography>
+                </Button>
               ))}
             </Typography>
 
+            <Typography variant="h6">Play Tone: </Typography>
+
             <Typography variant="h6">
-              Play Tone: {' '}
+              {' '}
               {['1', '2', '3', '4'].map(tone => (
                 <Button
                     key={tone}
                     onClick={() => handlePlayTone(tone)}
                     disabled={selectedTone === null || currentFile === null}
+                    sx={{ textTransform: 'none' }}
                   >
-                    Tone {tone}
-                  </Button>
+                    <Typography variant="h6" component="span" style={{fontWeight: 'bold'}}>
+                      {convertToPinyin(soundInfo.sound, tone)}
+                    </Typography>
+
+                </Button>
               ))}
             </Typography>
 
           </Paper>
+          <Button variant="contained" color="primary" onClick={handleDifferentSpeaker} disabled={!currentFile} startIcon={<ChangeCircleRoundedIcon />}>
+        Speaker
+      </Button>
         </Box>
 
-        <Box mb={2}>
+        <Box mb={2} width={isMobile ? '100%' : '50%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
           <Typography variant="h6">
               Statistics: {statistics.correct} / {statistics.total} (

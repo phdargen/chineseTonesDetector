@@ -2,15 +2,26 @@ import React, { useState, useEffect } from 'react';
 import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
 import { Box, Button, Paper, Typography } from '@mui/material';
+import { useTheme, useMediaQuery } from '@mui/material';
+
+import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
+import MicRoundedIcon from '@mui/icons-material/MicRounded';
+import PlayCircleFilledRoundedIcon from '@mui/icons-material/PlayCircleFilledRounded';
+
+const convertToPinyin = require('./convertToPinyin');
 
 // API
 // const api_url = 'http://localhost:5000/api/'
+//const api_url = 'http://ec2-18-117-255-194.us-east-2.compute.amazonaws.com:5000/api/'
 const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 // Maximum recording time in seconds
 const MAX_RECORDING_TIME = 1; 
 
 const VoiceRecordingButton = () => {
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Get example word to speak
   const [currentFile, setCurrentFile] = useState(null);
@@ -170,29 +181,31 @@ const VoiceRecordingButton = () => {
   };
 
 return (
-  <div>
-    <Typography variant="h1">Speaking</Typography>
+  <div className="speaking" style={{ padding: isMobile ? '10px' : '20px', margin: isMobile ? '10px' : '20px', justifyContent: 'center', alignItems: 'center'  }}>
+  
+    {/* <Typography variant="h1">Speaking</Typography> */}
 
-    <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying && prediction === null}>
+    <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying && prediction === null} startIcon={<NavigateNextRoundedIcon/>}>
         Next Word
     </Button>
-    <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile}>
+    <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile} startIcon={<PlayCircleFilledRoundedIcon/>}>
         Play
     </Button>
     
-    <Box mb={2}>
+    <Box mb={2} width={isMobile ? '100%' : '50%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-            <Typography variant="h6"> Word: {soundInfo.sound} </Typography>
-            <Typography variant="h6"> Tone: {soundInfo.tone} </Typography>
+            {/* <Typography variant="h6"> Word: {soundInfo.sound} </Typography>
+            <Typography variant="h6"> Tone: {soundInfo.tone} </Typography> */}
+            { soundInfo.sound && <Typography variant="h6" fontWeight='bold'> {convertToPinyin(soundInfo.sound,soundInfo.tone)} (Tone {soundInfo.tone}) </Typography> }
     </Paper>
     </Box>
 
-    <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording}>
+    <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording} startIcon={<MicRoundedIcon/>}>
       Start Recording
     </Button>
     {/* <Button variant="contained" color="primary" onClick={stopRecording} disabled={!isRecording}>Stop Recording</Button> */}
 
-    <Box mb={2}>
+    <Box mb={2} width={isMobile ? '100%' : '50%'}>
     <Paper elevation={3} style={{ padding: '16px' }}>
       {audioBlob && (
           <div>
@@ -200,15 +213,19 @@ return (
           </div>
       )}
 
-      { prediction && <Typography variant="h6" color={getPredictionColor()} > Prediction: Tone {prediction} </Typography> }
+      { prediction && <Typography variant="h6" color={getPredictionColor()} > Prediction: {convertToPinyin(soundInfo.sound,prediction)} (Tone {prediction}) </Typography> }
 
     </Paper>
     </Box>
 
     {spectrumImage && (
+        <Box mb={2} width={isMobile ? '100%' : '50%'}>
+        <Paper elevation={3} style={{ padding: '5px' }}>
         <div>
-          <img src={`data:image/png;base64,${spectrumImage}`} alt="Spectrum" />
+          <img src={`data:image/png;base64,${spectrumImage}`} alt="Spectrum" width={'100%'} margin={'0'} padding={'0'} />
         </div>
+        </Paper>
+        </Box>
       )}
 
   </div>
