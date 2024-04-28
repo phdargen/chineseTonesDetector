@@ -12,10 +12,10 @@ function Sidebar() {
     <div className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: isMobile ? '30%' : '20%' }}>
       {/* <Typography variant="h2" align='center' style={{ fontWeight: 'bold', color: 'white' }} > Pingulino</Typography> */}
       
-      <Box sx={{ padding: '16px' }}>
+      <Box sx={{ padding: '5px' }}>
         <img 
           src="pingulino2.png" 
-          style={{ width: isMobile ? '100px' : '150px' }}
+          style={{ width: '100%' }}
         />
       </Box>
 

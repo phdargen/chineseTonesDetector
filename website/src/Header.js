@@ -29,7 +29,7 @@ function Header() {
   return (
     <div style={headerStyle}>
       {/* <img src="pingulino2.png" alt="Logo" style={logoStyle} /> */}
-      <Typography variant={isMobile ? "h2" : "h1"} style={typographyStyle}>
+      <Typography variant={isMobile ? "h3" : "h1"} style={typographyStyle}>
         Pingulino
       </Typography>
     </div>

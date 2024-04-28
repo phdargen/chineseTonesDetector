@@ -47,6 +47,8 @@ def about():
 def get_spectrum():
     app.logger.debug('Headers: %s', request.headers)
     app.logger.debug('Body: %s', request.data)
+    app.logger.debug('Files: %s', request.files)
+    
     try:
         audio_data = request.files["audio"]
         audio_format = audio_data.content_type.split('/')[-1]  
@@ -55,7 +57,7 @@ def get_spectrum():
         print(f"audio_format: {str(audio_format)}")
 
         # Convert audio from webm/mp3 to wav format
-        audio = AudioSegment.from_file(audio_data, format="mp3" if audio_format == "mpeg" or audio_format == "mp3" else "webm")
+        audio = AudioSegment.from_file(audio_data, format="mp3" if audio_format == "mpeg" or audio_format == "mp3" else "mp4" if audio_format == "mp4" else "webm")
         wav_audio = audio.set_frame_rate(44100)  
         wav_audio.export("temp_audio.wav", format="wav")
         
@@ -175,5 +177,5 @@ def get_file_access():
 
 if __name__ == "__main__":
     #app.run(debug=True)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 

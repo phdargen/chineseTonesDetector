@@ -18,6 +18,9 @@
   margin: 4px 0;
 }
 
+.audioPlayer {
+  width: 100%;  
+}
 
 .content {
   width: 100%;

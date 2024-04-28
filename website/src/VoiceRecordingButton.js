@@ -186,7 +186,7 @@ return (
     {/* <Typography variant="h1">Speaking</Typography> */}
 
     <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying && prediction === null} startIcon={<NavigateNextRoundedIcon/>}>
-        Next Word
+    {currentFile === null ? "Start" : "Next"}
     </Button>
     <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile} startIcon={<PlayCircleFilledRoundedIcon/>}>
         Play
@@ -200,7 +200,7 @@ return (
     </Paper>
     </Box>
 
-    <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording} startIcon={<MicRoundedIcon/>}>
+    <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording || currentFile === null} startIcon={<MicRoundedIcon/>}>
       Start Recording
     </Button>
     {/* <Button variant="contained" color="primary" onClick={stopRecording} disabled={!isRecording}>Stop Recording</Button> */}
@@ -209,7 +209,7 @@ return (
     <Paper elevation={3} style={{ padding: '16px' }}>
       {audioBlob && (
           <div>
-            <AudioPlayer src={URL.createObjectURL(audioBlob)} controls />
+            <AudioPlayer src={URL.createObjectURL(audioBlob)} controls className="audioPlayer" />
           </div>
       )}
 
