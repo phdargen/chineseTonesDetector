@@ -11,7 +11,7 @@ function getNewSpeaker(speakers, currentSpeaker) {
 
 // API
 // const api_url = 'http://localhost:5000/api/'
-const api_url = 'http://ec2-18-117-255-194.us-east-2.compute.amazonaws.com:5000/api/'
+const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 async function fetchUrl(newFileUrl) {
   try {
