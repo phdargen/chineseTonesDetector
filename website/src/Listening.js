@@ -189,16 +189,16 @@ function Listening() {
   const getButtonColor = (tone) => {
     if(tone === soundInfo.tone ) return "green";
     if(tone === selectedTone && tone !== soundInfo.tone ) return "red";
-    return "primary";
+    return "";
   };
 
   return (
     <div className="listening" style={{ padding: isMobile ? '10px' : '20px', margin: isMobile ? '10px' : '20px', justifyContent: 'center', alignItems: 'center'  }}>
       {/* <Typography variant="h1">Listening</Typography> */}
-      <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying} startIcon={<PlayCircleFilledRoundedIcon />}>
+      <Button variant="contained" onClick={playRandomSound} disabled={isPlaying} startIcon={<PlayCircleFilledRoundedIcon />}>
         Next 
       </Button>
-      <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile} startIcon={<ReplayCircleFilledRoundedIcon />}>
+      <Button variant="contained" onClick={replaySound} disabled={!currentFile} startIcon={<ReplayCircleFilledRoundedIcon />}>
         Replay
       </Button>
       <div>
@@ -219,14 +219,10 @@ function Listening() {
                     onClick={() => handleToneSelection(tone)}
                     disabled={selectedTone !== null || currentFile === null}
                     sx={{
-                      bgcolor: 'primary',  
-                      color: 'primary',
                       textTransform: 'none',  
                       ':hover': {
-                        bgcolor: 'primary',  
                       },
                       '&.Mui-disabled': {
-                        bgcolor: 'primary',  
                         color: getButtonColor(tone),  
                       }
                     }}
@@ -258,7 +254,7 @@ function Listening() {
             </Typography>
 
           </Paper>
-          <Button variant="contained" color="primary" onClick={handleDifferentSpeaker} disabled={!currentFile} startIcon={<ChangeCircleRoundedIcon />}>
+          <Button variant="contained"  onClick={handleDifferentSpeaker} disabled={!currentFile} startIcon={<ChangeCircleRoundedIcon />}>
         Speaker
       </Button>
         </Box>

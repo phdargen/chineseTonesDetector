@@ -23,7 +23,7 @@ function convertToPinyin(base, tone) {
     // Get vowel to place tone mark
     const vowel = primaryVowel(base);
     if (!vowel) {
-        console.error("No vowel found");
+        //console.error("No vowel found");
         return base;  
     }
 
@@ -37,12 +37,12 @@ function convertToPinyin(base, tone) {
 }
 
 // Example usage
-console.log(convertToPinyin('ma', 1)); // Outputs: mā
-console.log(convertToPinyin('ma', 2)); // Outputs: má
-console.log(convertToPinyin('ma', 3)); // Outputs: mǎ
-console.log(convertToPinyin('ma', 4)); // Outputs: mà
-console.log(convertToPinyin('ma', 0)); // Outputs: ma (neutral tone)
-console.log(convertToPinyin('ma', 5)); // Outputs: ma (neutral tone)
+// console.log(convertToPinyin('ma', 1)); // Outputs: mā
+// console.log(convertToPinyin('ma', 2)); // Outputs: má
+// console.log(convertToPinyin('ma', 3)); // Outputs: mǎ
+// console.log(convertToPinyin('ma', 4)); // Outputs: mà
+// console.log(convertToPinyin('ma', 0)); // Outputs: ma (neutral tone)
+// console.log(convertToPinyin('ma', 5)); // Outputs: ma (neutral tone)
 
 // Run test
 // node src/convertToPinyin.js 
