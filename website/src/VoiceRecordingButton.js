@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
-import { Box, Button, Paper, Typography } from '@mui/material';
+import { Box, Button, Paper, Typography, LinearProgress } from '@mui/material';
 import { useTheme, useMediaQuery } from '@mui/material';
 
 import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
@@ -13,7 +13,6 @@ const convertToPinyin = require('./convertToPinyin');
 
 // API
 // const api_url = 'http://localhost:5000/api/'
-//const api_url = 'http://ec2-18-117-255-194.us-east-2.compute.amazonaws.com:5000/api/'
 const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 // Maximum recording time in seconds
@@ -101,33 +100,36 @@ const VoiceRecordingButton = () => {
     let interval;
     if (isRecording) {
       interval = setInterval(() => {
-        setRecordedTime((prevTime) => prevTime + 1);
-
-        // Stop recording after MAX_RECORDING_TIME time
+        setRecordedTime((prevTime) => prevTime + 0.1);
         if (recordedTime >= MAX_RECORDING_TIME) {
           stopRecording();
         }
-      }, 1000);
+      }, 100);
     } else {
       clearInterval(interval);
     }
 
     return () => clearInterval(interval);
-  }, [isRecording, recordedTime]);
+  }, [isRecording,recordedTime]);
 
   const startRecording = async () => {
+    setIsRecording(false);
+    setRecordedTime(0);
+    setIsRecording(true);
+    console.log('recorded time at start', recordedTime)
+
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const options = { type: 'audio', mimeType: 'audio/webm' };
     const audioRecorder = new RecordRTC(stream, options);
     audioRecorder.startRecording();
     setRecorder(audioRecorder);
-    setIsRecording(true);
-    setRecordedTime(0);
   };
 
   const stopRecording = () => {
     if (recorder) {
       recorder.stopRecording(() => {
+        console.log('recorded time', recordedTime)
+
         const audioBlob = recorder.getBlob();
         setAudioBlob(audioBlob);
         setIsRecording(false);
@@ -160,6 +162,7 @@ const VoiceRecordingButton = () => {
     } catch (error) {
       console.error('Error fetching spectrum data:', error);
     }
+    setRecordedTime(0);
   };
 
   const replayAudio = () => {
@@ -168,12 +171,6 @@ const VoiceRecordingButton = () => {
       const audio = new Audio(audioUrl);
       audio.play();
     }
-  };
-
-  const progressBarStyle = {
-    width: `${(recordedTime / MAX_RECORDING_TIME) * 100}%`,
-    background: 'linear-gradient(to right, #00aaff, #0077dd)',
-    height: '20px', 
   };
 
   const getPredictionColor = () => {
@@ -198,14 +195,16 @@ return (
     </Paper>
     </Box>
     )}
-
-  
   
     <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording || currentFile === null} startIcon={<MicRoundedIcon/>}>
       Start Recording
     </Button>
-    {/* <Button variant="contained" color="primary" onClick={stopRecording} disabled={!isRecording}>Stop Recording</Button> */}
-
+    {currentFile && (
+    <Box width={isMobile ? '100%' : '50%'} mb={2}>
+       <LinearProgress variant="determinate" value={Math.min((recordedTime / MAX_RECORDING_TIME) * 100,100)} />
+    </Box>
+    )}  
+    
     {currentFile && prediction && (
     <Box mb={2} width={isMobile ? '100%' : '50%'}>
     <Paper elevation={3} style={{ padding: '16px' }}>
