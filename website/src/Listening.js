@@ -194,20 +194,18 @@ function Listening() {
 
   return (
     <div className="listening" style={{ padding: isMobile ? '10px' : '20px', margin: isMobile ? '10px' : '20px', justifyContent: 'center', alignItems: 'center'  }}>
-      {/* <Typography variant="h1">Listening</Typography> */}
+      
       <Button variant="contained" onClick={playRandomSound} disabled={isPlaying} startIcon={<PlayCircleFilledRoundedIcon />}>
-        Next 
+        {currentFile === null ? "Start" : "Next"} 
       </Button>
       <Button variant="contained" onClick={replaySound} disabled={!currentFile} startIcon={<ReplayCircleFilledRoundedIcon />}>
         Replay
       </Button>
-      <div>
 
-        <Box mb={2} width={isMobile ? '100%' : '50%'}>
+      {currentFile && (   
+      <Box mb={2} width={isMobile ? '100%' : '50%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
             <Typography variant="h6" fontWeight='bold'> {soundInfo.sound}</Typography>
-            {/* <Typography variant="h6">Tone: {soundInfo.tone}</Typography> */}
-            {/* <Typography variant="h6">Speaker: {soundInfo.speaker}</Typography> */}
 
             <Typography variant="h6">Select Tone: </Typography>
 
@@ -253,21 +251,24 @@ function Listening() {
               ))}
             </Typography>
 
-          </Paper>
+        </Paper>
           <Button variant="contained"  onClick={handleDifferentSpeaker} disabled={!currentFile} startIcon={<ChangeCircleRoundedIcon />}>
-        Speaker
-      </Button>
-        </Box>
-
-        <Box mb={2} width={isMobile ? '100%' : '50%'}>
-          <Paper elevation={3} style={{ padding: '16px' }}>
+            Speaker
+          </Button>
+      </Box>
+      ) }
+      
+      {currentFile && (
+      <Box mb={2} width={isMobile ? '100%' : '50%'}>
+        <Paper elevation={3} style={{ padding: '16px' }}>
           <Typography variant="h6">
               Statistics: {statistics.correct} / {statistics.total} (
              {statistics.total > 0 ? (statistics.correct / statistics.total * 100).toFixed(1) : 0} %)
           </Typography>
-          </Paper>
-        </Box>
-      </div>
+        </Paper>
+      </Box>
+      ) }
+   
     </div>
   );
 }

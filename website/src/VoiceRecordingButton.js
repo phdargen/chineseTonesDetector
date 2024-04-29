@@ -7,6 +7,7 @@ import { useTheme, useMediaQuery } from '@mui/material';
 import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import PlayCircleFilledRoundedIcon from '@mui/icons-material/PlayCircleFilledRounded';
+import ReplayCircleFilledRoundedIcon from '@mui/icons-material/ReplayCircleFilledRounded';
 
 const convertToPinyin = require('./convertToPinyin');
 
@@ -183,28 +184,29 @@ const VoiceRecordingButton = () => {
 return (
   <div className="speaking" style={{ padding: isMobile ? '10px' : '20px', margin: isMobile ? '10px' : '20px', justifyContent: 'center', alignItems: 'center'  }}>
   
-    {/* <Typography variant="h1">Speaking</Typography> */}
-
-    <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying && prediction === null} startIcon={<NavigateNextRoundedIcon/>}>
+    <Button variant="contained" color="primary" onClick={playRandomSound} disabled={isPlaying && prediction === null} startIcon={<PlayCircleFilledRoundedIcon/>}>
     {currentFile === null ? "Start" : "Next"}
     </Button>
-    <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile} startIcon={<PlayCircleFilledRoundedIcon/>}>
+    <Button variant="contained" color="primary" onClick={replaySound} disabled={!currentFile} startIcon={<ReplayCircleFilledRoundedIcon/>}>
         Play
     </Button>
     
+    {currentFile && (
     <Box mb={2} width={isMobile ? '100%' : '50%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-            {/* <Typography variant="h6"> Word: {soundInfo.sound} </Typography>
-            <Typography variant="h6"> Tone: {soundInfo.tone} </Typography> */}
             { soundInfo.sound && <Typography variant="h6" fontWeight='bold'> {convertToPinyin(soundInfo.sound,soundInfo.tone)} (Tone {soundInfo.tone}) </Typography> }
     </Paper>
     </Box>
+    )}
 
+  
+  
     <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording || currentFile === null} startIcon={<MicRoundedIcon/>}>
       Start Recording
     </Button>
     {/* <Button variant="contained" color="primary" onClick={stopRecording} disabled={!isRecording}>Stop Recording</Button> */}
 
+    {currentFile && prediction && (
     <Box mb={2} width={isMobile ? '100%' : '50%'}>
     <Paper elevation={3} style={{ padding: '16px' }}>
       {audioBlob && (
@@ -217,6 +219,7 @@ return (
 
     </Paper>
     </Box>
+    )}
 
     {spectrumImage && (
         <Box mb={2} width={isMobile ? '100%' : '50%'}>
