@@ -11,6 +11,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 
 import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 const theme = createTheme({
   palette: {
@@ -33,6 +34,7 @@ function App() {
   return (
     <>
     <Analytics/>
+    <SpeedInsights/>
     <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>

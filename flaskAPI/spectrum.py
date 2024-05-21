@@ -19,6 +19,7 @@ CORS(app, resources={
     r"/api/about": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
     r"/api/random-sound": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
     r"/api/get_file_access": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
+    r"/api/upload": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
 })
 
 # AWS S3 setup
@@ -173,6 +174,30 @@ def get_file_access():
 
     except Exception as e:
         print(f"Error generating presigned URL: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files or 'filename' not in request.form:
+        return jsonify({'error': 'No file or filename part in the request'}), 400
+    
+    file = request.files['file']
+    filename = request.form['filename']
+    content_type = request.form['contentType']
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected for uploading'}), 400
+
+    if not filename:
+        return jsonify({'error': 'No filename provided'}), 400
+    
+    try:
+        file_name = f"user_data/{filename}"
+        s3_client.upload_fileobj(file, bucket_name, file_name, ExtraArgs={'ContentType': content_type})
+        file_url = f"https://{bucket_name}.s3.us-east-2.amazonaws.com/{file_name}"
+        return jsonify({'url': file_url}), 200
+    except Exception as e:
+        print(f"Error uploading file: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":

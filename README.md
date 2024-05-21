@@ -8,6 +8,7 @@ conda create --name chineseTones_env python=3.8
 conda activate chineseTones_env
 pip install jupyter 
 pip install requests numpy matplotlib librosa pandas seaborn tensorflow boto3
+pip install gTTS
 ```
 
 ### download data samples

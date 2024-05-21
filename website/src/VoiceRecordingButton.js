@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
 import { Box, Button, Paper, Typography, LinearProgress } from '@mui/material';
@@ -8,15 +8,18 @@ import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import PlayCircleFilledRoundedIcon from '@mui/icons-material/PlayCircleFilledRounded';
 import ReplayCircleFilledRoundedIcon from '@mui/icons-material/ReplayCircleFilledRounded';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const convertToPinyin = require('./convertToPinyin');
 
 // API
-// const api_url = 'http://localhost:5000/api/'
+//const api_url = 'http://localhost:5000/api/'
 const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 // Maximum recording time in seconds
 const MAX_RECORDING_TIME = 1; 
+// Timeout before recording in seconds
+const TIMEOUT_RECORDING = 0.5;
 
 const VoiceRecordingButton = () => {
 
@@ -96,49 +99,55 @@ const VoiceRecordingButton = () => {
   const [spectrumImage, setSpectrumImage] = useState(null);
   const [prediction, setPrediction] = useState(null);
 
-  useEffect(() => {
-    let interval;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordedTime((prevTime) => prevTime + 0.1);
-        if (recordedTime >= MAX_RECORDING_TIME) {
-          stopRecording();
-        }
-      }, 100);
-    } else {
-      clearInterval(interval);
-    }
-
-    return () => clearInterval(interval);
-  }, [isRecording,recordedTime]);
-
   const startRecording = async () => {
     setIsRecording(false);
     setRecordedTime(0);
-    setIsRecording(true);
     console.log('recorded time at start', recordedTime)
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const options = { type: 'audio', mimeType: 'audio/webm' };
-    const audioRecorder = new RecordRTC(stream, options);
-    audioRecorder.startRecording();
-    setRecorder(audioRecorder);
+
+    setTimeout(() => {
+      const audioRecorder = new RecordRTC(stream, options);
+      setIsRecording(true);
+      audioRecorder.startRecording();
+      setRecorder(audioRecorder);
+  }, TIMEOUT_RECORDING * 1000);
+
   };
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (recorder) {
       recorder.stopRecording(() => {
         console.log('recorded time', recordedTime)
-
+  
         const audioBlob = recorder.getBlob();
         setAudioBlob(audioBlob);
         setIsRecording(false);
-
+  
         // Fetch spectrum image when recording stops
         fetchSpectrum(audioBlob);
       });
     }
-  };
+  }, [recorder, recordedTime]);
+
+  useEffect(() => {
+    let interval;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordedTime((prevTime) => {
+          if (prevTime >= MAX_RECORDING_TIME) {
+            stopRecording();
+            clearInterval(interval); 
+            return prevTime; 
+          }
+          return prevTime + 0.1;
+        });
+      }, 100);
+    }
+  
+    return () => clearInterval(interval); 
+  }, [isRecording,stopRecording]);
 
   const fetchSpectrum = async (audioData) => {
     try {
@@ -165,19 +174,44 @@ const VoiceRecordingButton = () => {
     setRecordedTime(0);
   };
 
-  const replayAudio = () => {
-    if (audioBlob) {
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.play();
-    }
-  };
-
   const getPredictionColor = () => {
     if( String(prediction) === soundInfo.tone ) return "green";
     return "red";
   };
 
+  const uploadRecording = async () => {
+    if (!audioBlob) {
+      console.error('No file to upload');
+      return;
+    }
+  
+    const filename = `${Date.now()}_${soundInfo.sound}_${soundInfo.tone}_${prediction}`;
+  
+    const formData = new FormData();
+    formData.append('file', audioBlob);
+    formData.append('filename', filename);
+    formData.append('contentType', 'audio/webm');
+
+    try {
+      const response = await fetch(api_url+'upload', {
+        method: 'POST',
+        body: formData,
+      });
+  
+      const data = await response.json();
+      if (response.ok) {
+        console.log('Upload Success', data.url);
+        alert('File uploaded successfully!');
+      } else {
+        console.error('Upload Error', data.error);
+        alert('File upload failed.');
+      }
+    } catch (error) {
+      console.error('Upload Error', error);
+      alert('File upload failed.');
+    }
+  };
+  
 return (
   <div className="speaking" style={{ padding: isMobile ? '10px' : '20px', margin: isMobile ? '10px' : '20px', justifyContent: 'center', alignItems: 'center'  }}>
   
@@ -199,6 +233,11 @@ return (
     <Button variant="contained" color="primary" onClick={startRecording} disabled={isRecording || currentFile === null} startIcon={<MicRoundedIcon/>}>
       Start Recording
     </Button>
+
+    <Button variant="contained" color="primary" onClick={uploadRecording} disabled={isRecording || currentFile === null || prediction === null} startIcon={<CloudUploadIcon/>}>
+      Upload
+    </Button>
+
     {currentFile && (
     <Box width={isMobile ? '100%' : '50%'} mb={2}>
        <LinearProgress variant="determinate" value={Math.min((recordedTime / MAX_RECORDING_TIME) * 100,100)} />
