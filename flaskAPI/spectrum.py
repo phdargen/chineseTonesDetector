@@ -13,6 +13,15 @@ import boto3
 import random
 import re
 
+import sys
+import os
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+from trainML.processAudio import make_spectrum
+samplingRate = 22050
+modelName = '../trainML/tfModelTones_v2'
+
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/get_spectrum": {"origins": ["*", "https://chinese-tones-detector.vercel.app/*"]},
@@ -27,12 +36,11 @@ s3_client = boto3.client('s3')
 bucket_name = 'chinesetonesdata'
 
 # load tf model   
-model = tf.keras.models.load_model('../prepareData/tfModelTones')
+model = tf.keras.models.load_model(modelName)
 
 def load_and_preprocess_image(file_path):
     img = tf.keras.preprocessing.image.load_img(file_path, target_size=(128, 128))
     img = tf.keras.preprocessing.image.img_to_array(img)
-    #img = datagen.random_transform(img)
     img = img / 255.0
     return img
 
@@ -59,39 +67,28 @@ def get_spectrum():
 
         # Convert audio from webm/mp3 to wav format
         audio = AudioSegment.from_file(audio_data, format="mp3" if audio_format == "mpeg" or audio_format == "mp3" else "mp4" if audio_format == "mp4" else "webm")
-        wav_audio = audio.set_frame_rate(44100)  
+        wav_audio = audio.set_frame_rate(samplingRate)  
         wav_audio.export("temp_audio.wav", format="wav")
         
         # Process audio
-        #audio, sr = librosa.load(audio_data)
-        audio, sr = librosa.load("temp_audio.wav")
-        audio, index = librosa.effects.trim(audio, top_db=30, ref=np.max, frame_length=2048, hop_length=512)
-
-        # Compute the short-time Fourier transform (STFT)
-        D = librosa.stft(audio)
-
-        # Compute the magnitude spectrum
-        magnitude = np.abs(D)
-
-        # Convert to dB scale
-        log_magnitude = librosa.amplitude_to_db(magnitude, ref=np.max)
-
-        # Plot the spectrum
-        plt.figure(figsize=(8, 4))
-        librosa.display.specshow(log_magnitude, sr=sr, x_axis='time', y_axis='log')
+        audio, sr = librosa.load("temp_audio.wav",sr=samplingRate)
+        m_db = make_spectrum(audio, sr, max_lenght=1, normalize=False)
+        img = librosa.display.specshow(m_db, x_axis='time',y_axis='mel')
         plt.axis('off')
-        # plt.ylim([32, 8192])
         plt.savefig('input.png', bbox_inches='tight', pad_inches=0, transparent=True)
 
-        plt.colorbar(format='%+2.0f dB')
-        plt.title('Spectrogram')
+        cbar = plt.colorbar(img, format='%+2.0f')
+        cbar.set_label('Amplitude (dB)')
+        plt.xlabel('Time [s]')
+        plt.ylabel('Frequency [Hz]')
+        plt.ylim([0, 4096])        
         plt.axis('on')
 
     except Exception as e:
         print(f"Error processing audio: {str(e)}")
         # Create a placeholder spectrum 
         plt.figure(figsize=(8, 4))
-        librosa.display.specshow(np.random.rand(10, 100), sr=44100)
+        librosa.display.specshow(np.random.rand(10, 100), sr=samplingRate)
         plt.axis('off')
 
     ## Save plot
@@ -186,7 +183,7 @@ def upload():
     content_type = request.form['contentType']
 
     if file.filename == '':
-        return jsonify({'error': 'No file selected for uploading'}), 400
+        return jsonify({'error': 'No file selected'}), 400
 
     if not filename:
         return jsonify({'error': 'No filename provided'}), 400

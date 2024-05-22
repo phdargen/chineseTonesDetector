@@ -13,8 +13,8 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 const convertToPinyin = require('./convertToPinyin');
 
 // API
-//const api_url = 'http://localhost:5000/api/'
-const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
+const api_url = 'http://localhost:5000/api/'
+//const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 // Maximum recording time in seconds
 const MAX_RECORDING_TIME = 1; 
