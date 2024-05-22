@@ -64,21 +64,43 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     X_test = np.array([load_and_preprocess_image(fp) for fp in X_test])
 
     # Define model
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
-        MaxPooling2D(2, 2),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(2, 2),
-        Flatten(),
-        Dense(128, activation='relu'),
-        Dense(num_classes, activation='softmax')
-    ])
+    N_hiddenLayers = 3
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)))
+    model.add(MaxPooling2D(2, 2))
+    for _ in range(N_hiddenLayers):
+        model.add(Conv2D(64, (3, 3), activation='relu'))
+        model.add(MaxPooling2D(2, 2))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(num_classes, activation='softmax'))
+
+    # model = Sequential([
+    #     Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
+    #     MaxPooling2D(2, 2),
+    #     Conv2D(64, (3, 3), activation='relu'),
+    #     MaxPooling2D(2, 2),
+    #     Flatten(),
+    #     Dense(128, activation='relu'),
+    #     Dense(num_classes, activation='softmax')
+    # ])
 
     # Train model
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
     result = model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+
     model.save(modelName)
+    # Convert the model to TFLite format
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    tflite_model = converter.convert()
+
+    # Save the converted model to a file
+    tflite_model_name = 'my_model.tflite'
+    with open(tflite_model_name, 'wb') as f:
+        f.write(tflite_model)
+
+    print(f"Model saved as {tflite_model_name}")
 
     # Print performance
     loss, accuracy = model.evaluate(X_test, y_test)
