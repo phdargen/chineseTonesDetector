@@ -2,7 +2,6 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa.display
-import IPython.display as ipd  
 
 import os
 import csv

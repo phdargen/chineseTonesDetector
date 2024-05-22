@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa.display
-import IPython.display as ipd  
 from scipy.signal import butter, sosfilt
 
 import os
@@ -96,7 +95,7 @@ def get_mp3_info(y,sr):
     }
 
 def make_spectrum(audio, sr, max_lenght=1, normalize=False):
-    
+
     # Trim silence
     audio, index = librosa.effects.trim(audio, top_db=30, ref=np.max, frame_length=256, hop_length=64)
     #print(librosa.get_duration(y=audio,sr=sr))
