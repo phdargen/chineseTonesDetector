@@ -125,6 +125,11 @@ const About = () => {
           Pingulino provides instant visual feedback on your pronunciation by displaying the mel spectrogram of your voice recording. 
           Additionally, machine learning algorithms predict the tone of your recording. Instead of using audio samples directly, mel spectrograms are employed to train image classification algorithms. 
           By analyzing the visual patterns in mel spectrograms, these machine learning models learn to recognize the correct pitch patterns for each tone. When you speak into the system, it compares your pronunciation to the ideal patterns using these trained models.        
+          <br />  <br />
+          Standard speech recognition models typically focus on transcribing speech to produce valid language from audio input. 
+          For instance, take the phrase "nǐ hǎo," which means "hello" in Mandarin.
+          If you pronounce it as "Nì hào," a conventional Mandarin speech recognition model would likely correct it to "nǐ hǎo," aiming to understand and produce valid Mandarin, rather than providing feedback on pronunciation accuracy.
+          In contrast, Pingulino's machine learning models are specifically designed to distinguish between different tones, ensuring that users receive precise feedback on their pronunciation.
           </Typography>
 
           </Paper>
