@@ -16,21 +16,18 @@ const About = () => {
     <Grid item xs={12} sm={6} >
           <Box mb={2} width={isMobile ? '100%' : '100%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-          <Typography variant="h4" style={{ fontWeight: 'bold' }}> The Importance of Tones in Mandarin Chinese</Typography>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> The Importance of Tones in Mandarin Chinese</Typography>
 
-          <Typography variant="body1" style={{ marginTop: '16px' }}>
-        Mandarin Chinese is a tonal language, where the pitch of a word can change its meaning completely. 
-        Correctly using tones in Mandarin is crucial for clear communication. 
-        Mandarin has four main tones:<br />
-        1. <strong>First Tone</strong>: High and level (mā - 妈, "mother")<br />
-        2. <strong>Second Tone</strong>: Rising (má - 麻, "hemp")<br />
-        3. <strong>Third Tone</strong>: Falling and rising (mǎ - 马, "horse")<br />
-        4. <strong>Fourth Tone</strong>: Sharp and falling (mà - 骂, "to scold")<br />
-        For example, "ma" can mean "mother," "hemp," "horse," or "to scold," depending on the tone.<br />
-
-        This is different from English, where tone mainly conveys emotion or emphasis.
-        For instance, "Really?" (rising tone) indicates a question or surprise, while "I really like it" (emphasis on "really") shows strong affirmation.
-        </Typography>
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+            Mandarin Chinese is a tonal language, where the pitch of a word changes its meaning completely. <br />
+            For example, "ma" can mean "mother," "hemp," "horse," or "to scold," depending on the tone:<br />
+            1. <strong>First Tone</strong>: High and level (mā - 妈, "mother")<br />
+            2. <strong>Second Tone</strong>: Rising (má - 麻, "hemp")<br />
+            3. <strong>Third Tone</strong>: Falling and rising (mǎ - 马, "horse")<br />
+            4. <strong>Fourth Tone</strong>: Sharp and falling (mà - 骂, "to scold")<br />
+            This is different from English, where tone mainly conveys emotion or emphasis. <br />
+            For instance, "Really?" (rising tone) indicates a question or surprise, while "I really like it" (emphasis on "really") shows strong affirmation.
+          </Typography>
 
           </Paper>
           </Box>
@@ -42,13 +39,13 @@ const About = () => {
             <Box mb={2} width={isMobile ? '100%' : '100%'}>
               <Paper elevation={3} style={{ padding: '16px' }}>
                 <Box display="flex" flexDirection="column" alignItems="center" mt={2}>
-                  <Typography variant="h4" style={{ fontWeight: 'bold' }}> 妈 (mā)</Typography>
-                  <Typography variant="h6" >mother</Typography>
+                  <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> 妈 (mā)</Typography>
+                  <Typography variant={isMobile ? 'body2' : 'body1'} >mother</Typography>
                   <AudioPlayer src='ma1_FV1_MP3.mp3' controls className="audioPlayer" />
                 </Box>   
                 <img src='ma1_FV1.png' style={{ width: '100%', marginBottom: '16px' }} />
-                <Typography variant="h6" >1st tone: High and level</Typography>
-                <Typography variant="h6" > </Typography>
+                <Typography variant={isMobile ? 'body2' : 'body1'} >1st tone: High and level</Typography>
+                <Typography variant={isMobile ? 'body2' : 'body1'} > </Typography>
 
               </Paper>
             </Box>
@@ -58,12 +55,12 @@ const About = () => {
             <Box mb={2} width={isMobile ? '100%' : '100%'}>
               <Paper elevation={3} style={{ padding: '16px' }}>
                 <Box display="flex" flexDirection="column" alignItems="center" mt={2}>
-                  <Typography variant="h4" style={{ fontWeight: 'bold' }}>麻 (má)</Typography>
-                  <Typography variant="h6" >hemp</Typography>
+                  <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}>麻 (má)</Typography>
+                  <Typography variant={isMobile ? 'body2' : 'body1'} >hemp</Typography>
                   <AudioPlayer src='ma2_FV1_MP3.mp3' controls className="audioPlayer" />
                 </Box>   
                 <img src='ma2_FV1.png' style={{ width: '100%', marginBottom: '16px' }} />
-                <Typography variant="h6" >2nd tone: Rising</Typography>
+                <Typography variant={isMobile ? 'body2' : 'body1'} >2nd tone: Rising</Typography>
               </Paper>
             </Box>
           </Grid>
@@ -72,12 +69,12 @@ const About = () => {
             <Box mb={2} width={isMobile ? '100%' : '100%'}>
               <Paper elevation={3} style={{ padding: '16px' }}>
                 <Box display="flex" flexDirection="column" alignItems="center" mt={2}>
-                  <Typography variant="h4" style={{ fontWeight: 'bold' }}>马 (mǎ)</Typography>
-                  <Typography variant="h6" >horse</Typography>
+                  <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}>马 (mǎ)</Typography>
+                  <Typography variant={isMobile ? 'body2' : 'body1'} >horse</Typography>
                   <AudioPlayer src='ma3_FV1_MP3.mp3' controls className="audioPlayer" />
                 </Box>   
                 <img src='ma3_FV1.png' style={{ width: '100%', marginBottom: '16px' }} />
-                <Typography variant="h6" >3rd tone:  Falling and rising</Typography>
+                <Typography variant={isMobile ? 'body2' : 'body1'} >3rd tone:  Falling and rising</Typography>
               </Paper>
             </Box>
           </Grid>
@@ -86,16 +83,85 @@ const About = () => {
             <Box mb={2} width={isMobile ? '100%' : '100%'}>
               <Paper elevation={3} style={{ padding: '16px' }}>
                 <Box display="flex" flexDirection="column" alignItems="center" mt={2}>
-                  <Typography variant="h4" style={{ fontWeight: 'bold' }}>骂 (mà)</Typography>
-                  <Typography variant="h6" >to scold or to curse</Typography>
+                  <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}>骂 (mà)</Typography>
+                  <Typography variant={isMobile ? 'body2' : 'body1'} >to scold or to curse</Typography>
                   <AudioPlayer src='ma4_FV1_MP3.mp3' controls className="audioPlayer" />
                 </Box>   
                 <img src='ma4_FV1.png' style={{ width: '100%', marginBottom: '16px' }} />
-                <Typography variant="h6" >4th tone: Sharp and falling</Typography>
+                <Typography variant={isMobile ? 'body2' : 'body1'} >4th tone: Sharp and falling</Typography>
               </Paper>
             </Box>
           </Grid>
 
+      </Grid>
+
+      <Grid item xs={12} sm={6} >
+          <Box mb={2} width={isMobile ? '100%' : '100%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Mel Spectrograms</Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          Spectrograms are generated from sound signals using Fourier Transforms, which decompose the signal into its constituent frequencies and display the amplitude of each frequency present. 
+          A mel spectrogram visually represents sound, showing how it changes over time. 
+          The x-axis represents time, displaying the progression of the sound from start to finish. 
+          The y-axis represents frequency (or pitch) on the mel scale, which adjusts frequencies to match how humans perceive pitch. 
+          This adjustment makes it easier to see the distinct pitch patterns of Mandarin Chinese tones. 
+          The color bar shows the sound's loudness (amplitude) using the decibel (dB) scale, where louder sounds are brighter.
+          The decibel (dB) scale is logarithmic, meaning each 10 dB increase represents a tenfold increase in sound intensity and is perceived by humans as roughly twice as loud.
+          Pingulino aids learners in mastering Mandarin tones by providing a clear visual guide to pronunciation.
+
+        </Typography>
+
+          </Paper>
+          </Box>
+      </Grid>
+
+      <Grid item xs={12} sm={6} >
+          <Box mb={2} width={isMobile ? '100%' : '100%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Machine learning </Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          Pingulino provides instant visual feedback on your pronunciation by displaying the mel spectrogram of your voice recording. 
+          Additionally, machine learning algorithms predict the tone of your recording. Instead of using audio samples directly, mel spectrograms are employed to train image classification algorithms. 
+          By analyzing the visual patterns in mel spectrograms, these machine learning models learn to recognize the correct pitch patterns for each tone. When you speak into the system, it compares your pronunciation to the ideal patterns using these trained models.        
+          </Typography>
+
+          </Paper>
+          </Box>
+      </Grid>
+
+      <Grid item xs={12} sm={6} >
+          <Box mb={2} width={isMobile ? '100%' : '100%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Data set </Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          Pingulino's machine learning algorithms are trained using the Tone Perfect dataset from Michigan State University. 
+          This dataset includes the full catalog of monosyllabic sounds in Mandarin Chinese (410 in total) in all four tones (410 x 4 = 1,640). 
+          Spoken by six native Mandarin speakers (three female and three male), the collection is comprised of 9,840 audio files (6 sets of 1,640).
+          <br /> <br />
+          [Catherine Ryu, Mandarin Tone Perception & Production Team, and Michigan State University Libraries. Tone Perfect: Multimodal Database for Mandarin Chinese. https://tone.lib.msu.edu/.]
+          </Typography>
+
+          </Paper>
+          </Box>
+      </Grid>
+
+      <Grid item xs={12} sm={6} >
+          <Box mb={2} width={isMobile ? '100%' : '100%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Privacy Disclaimer </Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          We use Vercel Web Analytics to collect anonymized data about your visit to our site, including pages visited, operating system, and browser. 
+          No personal information or identifiers that track users across different sites are collected or stored. 
+          By using our site, you consent to this data collection.
+          Audio recordings are not stored and are only used for interference in our machine learning models.
+          </Typography>
+
+          </Paper>
+          </Box>
       </Grid>
 
     </div>

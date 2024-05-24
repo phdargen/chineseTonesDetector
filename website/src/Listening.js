@@ -268,6 +268,19 @@ function Listening() {
         </Paper>
       </Box>
       ) }
+
+      <Box mb={2} width={isMobile ? '100%' : '50%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Practice listening </Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          Press <strong>"Start"</strong> to play a random Mandarin Chinese syllable. <br/>
+          Listen carefully and select the tone you heard.   <br/>
+          Afterwards, you can play all four tones for the same syllable to better grasp their differences, or proceed to the next syllable.
+          </Typography>
+
+          </Paper>
+        </Box>
    
     </div>
   );

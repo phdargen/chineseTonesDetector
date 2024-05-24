@@ -269,6 +269,22 @@ return (
         </Box>
       )}
 
+    <Box mb={2} width={isMobile ? '100%' : '50%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Practice speaking </Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          Press  <strong>"Start"</strong> to play a random Mandarin Chinese syllable with a given tone. <br/>
+          Press  <strong>"Start Recording"</strong> and repeat what you heard. <br/>
+          Pingulino provides instant visual feedback on your pronunciation by displaying the mel spectrogram of your voice recording.  <br/>
+          In addition, a machine learning model compares your pronunciation to the ideal patterns. <br/>
+          Press  <strong>"Play"</strong> to repeat the reference audio sample and see how the ideal mel spectrogram should look.  <br/>
+
+          </Typography>
+
+          </Paper>
+    </Box>
+
   </div>
 );
           

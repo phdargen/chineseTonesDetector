@@ -6,6 +6,7 @@ import Listening from './Listening';
 import About from './About';
 import VoiceRecordingButton from './VoiceRecordingButton';
 import Header from './Header'; 
+import Home from './Home'; 
 
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
@@ -46,7 +47,8 @@ function App() {
                 <Route path="/listening" element={ <Listening/>} />
                 <Route path="/speaking" element={ <VoiceRecordingButton/>} />
                 <Route path="/about" element={ <About/>} />
-                <Route path="/" exact element={<Listening/>} /> {/* Default route */}
+                <Route path="/home" element={<Home/>} />
+                <Route path="/" exact element={<Home/>} /> {/* Default route */}
               </Routes>
             </div>
           </div>
