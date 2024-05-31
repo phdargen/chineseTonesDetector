@@ -18,25 +18,27 @@ def add_noise(audio, noise_factor=0.005):
     augmented_audio = audio + noise_factor * noise
     return augmented_audio
     
-def time_shift(audio, shift_max=0.2, shift_direction='both'):
-    shift = np.random.randint(len(audio) * shift_max)
-    print(shift)
+def time_shift(audio, shift_max=0.2, shift_direction='both', roll=False):
+    shift = int(len(audio) * shift_max * np.random.rand())
+    
     if shift_direction == 'right':
         shift = -shift
     elif shift_direction == 'both':
         shift = -shift if np.random.rand() > 0.5 else shift
-    return np.roll(audio, shift)
-
-def apply_filter(audio, sr, low_freq=32, high_freq=4096):
-    # Design a bandpass filter
-    sos = butter(10, [low_freq, high_freq], btype='bandpass', fs=sr, output='sos')
-    # Apply the filter
-    filtered_audio = sosfilt(sos, audio)
-    return filtered_audio
-
-def dynamic_range_compression(audio):
-    return librosa.effects.preemphasis(y=audio)
-
+    
+    if roll:
+        return np.roll(audio, shift)
+    else:
+        shifted_audio = np.zeros_like(audio)
+        if shift > 0:
+            shifted_audio[shift:] = audio[:-shift]
+        elif shift < 0:
+            shift = -shift
+            shifted_audio[:-shift] = audio[shift:]
+        else:
+            shifted_audio = audio  
+        return shifted_audio
+    
 def change_volume(audio, gain=1.5):
     return audio * gain
 
@@ -57,16 +59,27 @@ def spec_augment(mel_spectrogram, freq_mask_param=10, time_mask_param=10):
     return mel_spectrogram
 
 def augment_audio(audio, sr):
-    audio = time_stretch(audio=audio, rate=np.random.uniform(0.8, 1.2))
-    audio = pitch_shift(audio, sr, n_steps=np.random.randint(-2, 3))
-    audio = add_noise(audio, noise_factor=np.random.uniform(0.001, 0.01))
-    audio = time_shift(audio, shift_max=0.2, shift_direction='both')
-    audio = dynamic_range_compression(audio)
-    return audio
+    new_audio = audio
+    new_audio = time_stretch(audio=new_audio, rate=np.random.uniform(0.8, 1.2))
+    new_audio = time_shift(audio=new_audio, shift_max=0.2, shift_direction='both', roll=False)
+    new_audio = pitch_shift(audio=new_audio, sr=sr, n_steps=np.random.randint(-5, 5))
+    new_audio = add_noise(audio=new_audio, noise_factor=np.random.uniform(0.0, 0.02))
+    return new_audio
 
-def augment_mel_spectrogram(mel_spectrogram):
-    mel_spectrogram = spec_augment(mel_spectrogram, freq_mask_param=10, time_mask_param=10)
+def augment_mel_spectrogram(mel_spectrogram, freq_mask_param=10, time_mask_param=10):
+    mel_spectrogram = spec_augment(mel_spectrogram, freq_mask_param, time_mask_param)
     return mel_spectrogram
+
+
+def apply_filter(audio, sr, low_freq=32, high_freq=4096):
+    # Design a bandpass filter
+    sos = butter(10, [low_freq, high_freq], btype='bandpass', fs=sr, output='sos')
+    # Apply the filter
+    filtered_audio = sosfilt(sos, audio)
+    return filtered_audio
+
+def dynamic_range_compression(audio):
+    return librosa.effects.preemphasis(y=audio)
 
 def pad_or_truncate(audio, target_length):
     if len(audio) > target_length:

@@ -9,7 +9,7 @@ import csv
 import re
 import glob
 
-from processAudio import get_mp3_info, get_spectrum
+from processAudio import get_mp3_info, get_spectrum, augment_audio, augment_mel_spectrogram
 samplingRate = 22050
 
 def prepareExamples():
@@ -29,12 +29,13 @@ def prepareExamples():
         get_spectrum(audio=audio,sr=sr,max_lenght=1,output_file=image_fileName)
 
 
-def prepareAll(outDir="spectrum_data", csv_file = 'output.csv'):
+def prepareAll(outDir="spectrum_data", csv_file = 'output.csv',num_augmentations=5):
 
     os.makedirs(outDir, exist_ok=True)
 
     # Create a list to store the extracted data
     data = []
+    data_augmented = []
 
     # Loop through the files in the directory
     directory = '../raw_data/'
@@ -55,6 +56,18 @@ def prepareAll(outDir="spectrum_data", csv_file = 'output.csv'):
                 get_spectrum(audio=audio,sr=sr, max_lenght=1, normalize=False, output_file=img_filename, plot_axis=False)
                 
                 data.append([filename, img_filename, sound, tone, speaker, info["Duration (seconds)"], info["Frames"], info["Sampling Rate (Hz)"] ])
+
+                # Augment the audio data
+                for j in range(num_augmentations):
+                    augmented_audio = augment_audio(audio, sr)
+                    augmented_filename = f"{outDir}/{sound}{tone}_{speaker}_aug{j+1}"
+
+                    augmented_img_filename = f"{outDir}/{sound}{tone}_{speaker}_aug{j+1}.png"
+                    get_spectrum(audio=augmented_audio, sr=sr, max_lenght=1, normalize=False, output_file=augmented_img_filename, plot_axis=False)
+
+                    augmented_info = get_mp3_info(augmented_audio, sr)
+                    data_augmented.append([augmented_filename, augmented_img_filename, sound, tone, speaker, augmented_info["Duration (seconds)"], augmented_info["Frames"], augmented_info["Sampling Rate (Hz)"]])
+
             else:
                 print(f"Error: No match found for filename '{filename}'")
 
@@ -66,11 +79,17 @@ def prepareAll(outDir="spectrum_data", csv_file = 'output.csv'):
         writer = csv.writer(file)
         writer.writerow(['filename', 'img_filename', 'sound', 'tone', 'speaker', 'Duration (seconds)','Frames','Sampling Rate (Hz)'])
         writer.writerows(data)
-
     print(f'CSV file "{csv_file}" has been created')
 
+    if(num_augmentations>0):
+        augmented_csv_file = csv_file.replace('.csv', '_augmented.csv')
+        with open(augmented_csv_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['filename', 'img_filename', 'sound', 'tone', 'speaker', 'Duration (seconds)','Frames','Sampling Rate (Hz)'])
+            writer.writerows(data_augmented)
+        print(f'CSV file "{augmented_csv_file}" has been created')
 
-def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_output.csv'):
+def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_output.csv', num_augmentations=10):
 
     # Ensure output directory exists
     os.makedirs(outDir, exist_ok=True)
@@ -137,19 +156,23 @@ def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_ou
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true', help="Prepare example spectrograms")
+
     parser.add_argument('--noise', action='store_true', help="Prepare noise spectrograms")
     parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
     parser.add_argument('--noise_inDir', type=str, default="noise_data", help="Noise data dir")
 
     parser.add_argument('--csv_file', type=str, default="output.csv", help="CSV file name")
     parser.add_argument('--outDir', type=str, default="spectrum_data", help="Path to img dir")
+
+    parser.add_argument('--num_augmentations', type=int, default=0, help="Number of data augmentations")
+
     args = parser.parse_args()
 
     if args.test:
         prepareExamples()
     elif args.noise:
-        prepareNoise(args.noise_inDir, args.outDir, args.noise_csv_file)
-    else: prepareAll(args.outDir, args.csv_file)
+        prepareNoise(args.noise_inDir, args.outDir, args.noise_csv_file, args.num_augmentations)
+    else: prepareAll(args.outDir, args.csv_file, args.num_augmentations)
 
 if __name__ == "__main__":
     main()
