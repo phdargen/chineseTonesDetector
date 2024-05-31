@@ -2,10 +2,12 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa.display
+import soundfile as sf
 
 import os
 import csv
 import re
+import glob
 
 from processAudio import get_mp3_info, get_spectrum
 samplingRate = 22050
@@ -28,6 +30,9 @@ def prepareExamples():
 
 
 def prepareAll(outDir="spectrum_data", csv_file = 'output.csv'):
+
+    os.makedirs(outDir, exist_ok=True)
+
     # Create a list to store the extracted data
     data = []
 
@@ -64,15 +69,86 @@ def prepareAll(outDir="spectrum_data", csv_file = 'output.csv'):
 
     print(f'CSV file "{csv_file}" has been created')
 
+
+def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_output.csv'):
+
+    # Ensure output directory exists
+    os.makedirs(outDir, exist_ok=True)
+
+    # List to store extracted data
+    data = []
+
+    # Find all .webm files in directory
+    webm_files = glob.glob(os.path.join(inDir, '*'))
+
+    for i, webm_file in enumerate(webm_files):
+
+        # Load audio data 
+        audio, sr = librosa.load(webm_file, sr=samplingRate)
+
+        # Generate and save the spectrogram
+        img_filename = f"{outDir}/noise_sample_{i+1}.png"
+        get_spectrum(audio=audio, sr=samplingRate, max_lenght=1, normalize=False, output_file=img_filename, plot_axis=False)
+
+        # Collect noise sample info
+        info = get_mp3_info(audio, sr)
+        data.append([webm_file, img_filename, 'noise', 5, 'none', info["Duration (seconds)"], info["Frames"], info["Sampling Rate (Hz)"]])
+
+    # Create random combinations of noise samples
+    num_combinations=len(webm_files)*10
+    for j in range(num_combinations):
+        # Randomly select noise samples to combine
+        file1, file2, file3, file4 = np.random.choice(webm_files, 4, replace=False)
+        audio1, sr1 = librosa.load(file1, sr=samplingRate)
+        audio2, sr2 = librosa.load(file2, sr=samplingRate)
+        audio3, sr3 = librosa.load(file3, sr=samplingRate)
+        audio4, sr4 = librosa.load(file4, sr=samplingRate)
+
+        # Ensure audios have same length
+        min_len = min(len(audio1), len(audio2), len(audio3), len(audio4))
+        audio1 = audio1[:min_len]
+        audio2 = audio2[:min_len]
+        audio3 = audio3[:min_len]
+        audio4 = audio4[:min_len]
+
+        # Combine audio files
+        random_number = np.random.randint(0, 10)
+        combined_audio = audio1 + audio2
+        if (random_number>5): combined_audio += audio3
+        if (random_number>8): combined_audio += audio4
+
+        # Generate and save the spectrogram
+        combined_img_filename = f"{outDir}/combined_noise_sample_{j+1}.png"
+        get_spectrum(audio=combined_audio, sr=samplingRate, max_lenght=1, normalize=False, output_file=combined_img_filename, plot_axis=False)
+
+        # Collect combined noise sample info
+        combined_info = get_mp3_info(combined_audio, samplingRate)
+        data.append([f"combined_noise_sample_{j+1}", combined_img_filename, 'combined_noise', 5, 'none', combined_info["Duration (seconds)"], combined_info["Frames"], combined_info["Sampling Rate (Hz)"]])
+
+    # Write data to CSV
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['filename', 'img_filename', 'sound', 'tone', 'speaker', 'Duration (seconds)', 'Frames', 'Sampling Rate (Hz)'])
+        writer.writerows(data)
+
+    print(f'CSV file "{csv_file}" has been created with {len(webm_files)} noise samples')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true', help="Prepare example spectrograms")
+    parser.add_argument('--noise', action='store_true', help="Prepare noise spectrograms")
+    parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
+    parser.add_argument('--noise_inDir', type=str, default="noise_data", help="Noise data dir")
+
     parser.add_argument('--csv_file', type=str, default="output.csv", help="CSV file name")
     parser.add_argument('--outDir', type=str, default="spectrum_data", help="Path to img dir")
     args = parser.parse_args()
 
     if args.test:
         prepareExamples()
+    elif args.noise:
+        prepareNoise(args.noise_inDir, args.outDir, args.noise_csv_file)
     else: prepareAll(args.outDir, args.csv_file)
 
 if __name__ == "__main__":

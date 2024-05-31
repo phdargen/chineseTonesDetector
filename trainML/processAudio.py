@@ -128,12 +128,12 @@ def get_spectrum(audio, sr, max_lenght=1, normalize=False, output_file=None, plo
     m_db = make_spectrum(audio, sr, max_lenght, normalize)
     img = librosa.display.specshow(m_db, x_axis='time',y_axis='mel')
 
+    plt.ylim([0, 4096])
     if(plot_axis):
         cbar = plt.colorbar(img, format='%+2.0f')
         cbar.set_label('Amplitude (dB)')
         plt.xlabel('Time [s]')
         plt.ylabel('Frequency [Hz]')
-        plt.ylim([0, 4096])
     else:plt.axis('off')
     
     plt.tight_layout()

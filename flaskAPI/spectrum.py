@@ -20,7 +20,9 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from trainML.processAudio import make_spectrum
 samplingRate = 22050
-modelName = '../trainML/tfModelTones_v2'
+#modelName = '../trainML/tfModelTones_v3'
+#modelName = '../trainML/test'
+modelName = '../trainML/tfModelTones'
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -34,6 +36,8 @@ CORS(app, resources={
 # AWS S3 setup
 s3_client = boto3.client('s3')
 bucket_name = 'chinesetonesdata'
+#bucket_folder = 'noise_data'
+bucket_folder = 'user_data'
 
 # load tf model   
 model = tf.keras.models.load_model(modelName)
@@ -189,7 +193,7 @@ def upload():
         return jsonify({'error': 'No filename provided'}), 400
     
     try:
-        file_name = f"user_data/{filename}"
+        file_name = f"{bucket_folder}/{filename}"
         s3_client.upload_fileobj(file, bucket_name, file_name, ExtraArgs={'ContentType': content_type})
         file_url = f"https://{bucket_name}.s3.us-east-2.amazonaws.com/{file_name}"
         return jsonify({'url': file_url}), 200

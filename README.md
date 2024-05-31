@@ -9,6 +9,7 @@ conda activate chineseTones_env
 pip install jupyter 
 pip install requests numpy matplotlib librosa pandas seaborn tensorflow boto3
 pip install gTTS
+pip install soundfile
 ```
 
 ### download data samples

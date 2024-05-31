@@ -201,7 +201,7 @@ const VoiceRecordingButton = () => {
       const data = await response.json();
       if (response.ok) {
         console.log('Upload Success', data.url);
-        alert('File uploaded successfully!');
+        // alert('File uploaded successfully!');
       } else {
         console.error('Upload Error', data.error);
         alert('File upload failed.');
@@ -253,7 +253,8 @@ return (
           </div>
       )}
 
-      { prediction && <Typography variant="h6" fontWeight='bold' color={getPredictionColor()} > Prediction: {convertToPinyin(soundInfo.sound,prediction)} (Tone {prediction}) </Typography> }
+      { prediction && prediction < 5 && <Typography variant="h6" fontWeight='bold' color={getPredictionColor()} > Prediction: {convertToPinyin(soundInfo.sound,prediction)} (Tone {prediction}) </Typography> }
+      { prediction && prediction == 5 && <Typography variant="h6" fontWeight='bold' color={getPredictionColor()} > Prediction: Noise </Typography> }
 
     </Paper>
     </Box>
