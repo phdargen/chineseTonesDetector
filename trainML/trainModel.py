@@ -44,22 +44,19 @@ def plot_learning_curves(history):
     plt.legend(['Train', 'Validation'], loc='upper left')
     plt.savefig('loss.png')
 
-def addNoiseData(data, noise_csv, N):
-    noise_data = pd.read_csv(noise_csv)
-    if len(noise_data) > N:
-        noise_data = noise_data.sample(n=N, random_state=42)  # Sample N noise entries if more than N exist
+def addData(data, csv_file):
+    noise_data = pd.read_csv(csv_file)
     return pd.concat([data, noise_data], ignore_index=True)
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv'):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False):
 
     # Extract file paths and tone labels
     data = pd.read_csv(csv_file)
-    num_entries = data.shape[0]
-    print(f'Number of entries in output csv: {num_entries}')
+    print(f'Number of entries in output csv: {data.shape[0]}')
 
     # Add noise data
     if(addNoise):
-        data = addNoiseData(data, noise_csv, int(num_entries/4))
+        data = addData(data, noise_csv)
         print(f'Number of entries after adding noise: {data.shape[0]}')
 
     file_paths = data['img_filename']
@@ -76,13 +73,28 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     print("\nNumber of classes:", num_classes)
 
     # Split dataset into train+validation and test sets
-    X_temp, X_test, y_temp, y_test, speakers_temp, speakers_test = train_test_split(file_paths, tones_encoded, speakers, test_size=0.1, random_state=42)
-    # Split train+validation into separate train and validation sets
-    X_train, X_val, y_train, y_val, speakers_train, speakers_val = train_test_split(X_temp, y_temp, speakers_temp, test_size=0.1, random_state=42)
+    X_temp, X_test, y_temp, y_test, speakers_temp, speakers_test = train_test_split(file_paths, tones_encoded, speakers, test_size=0.1, random_state=42, stratify=tones_encoded)
+    # Split train+validation into train and validation sets
+    X_train, X_val, y_train, y_val, speakers_train, speakers_val = train_test_split(X_temp, y_temp, speakers_temp, test_size=0.2/0.9, random_state=42, stratify=y_temp)
     
     print(f'Number of training events: {X_train.shape[0]}')
     print(f'Number of validation events: {X_val.shape[0]}')
     print(f'Number of test events: {X_test.shape[0]}')
+
+    # Add augmented data to training set
+    if augmentData:
+        augmented_csv_file = csv_file.replace('.csv', '_augmented.csv')
+        augmented_data = pd.read_csv(augmented_csv_file)
+        augmented_noise_csv_file = noise_csv.replace('.csv', '_augmented.csv')
+        
+        if addNoise:
+            augmented_noise_data = pd.read_csv(augmented_noise_csv_file)
+            augmented_data = pd.concat([augmented_data, augmented_noise_data], ignore_index=True)
+            
+        X_train = pd.concat([pd.Series(X_train), augmented_data['img_filename']], ignore_index=True)
+        y_train = pd.concat([pd.Series(y_train), label_encoder.transform(augmented_data['tone'])], ignore_index=True)
+        speakers_train = pd.concat([pd.Series(speakers_train), augmented_data['speaker']], ignore_index=True)
+        print(f'Number of entries in training set after adding augmented data: {len(X_train)}')
 
     def check_distribution(name, tones, speakers):
         tones_dist = pd.Series(tones).value_counts(normalize=True)

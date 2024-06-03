@@ -2,7 +2,6 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa.display
-import soundfile as sf
 
 import os
 import csv
@@ -29,7 +28,7 @@ def prepareExamples():
         get_spectrum(audio=audio,sr=sr,max_lenght=1,output_file=image_fileName)
 
 
-def prepareAll(outDir="spectrum_data", csv_file = 'output.csv',num_augmentations=5):
+def prepareAll(outDir="spectrum_data", csv_file = 'output.csv', num_augmentations=0):
 
     os.makedirs(outDir, exist_ok=True)
 
@@ -89,13 +88,14 @@ def prepareAll(outDir="spectrum_data", csv_file = 'output.csv',num_augmentations
             writer.writerows(data_augmented)
         print(f'CSV file "{augmented_csv_file}" has been created')
 
-def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_output.csv', num_augmentations=10):
+def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_output.csv', num_augmentations=0):
 
     # Ensure output directory exists
     os.makedirs(outDir, exist_ok=True)
 
     # List to store extracted data
     data = []
+    data_augmented = []
 
     # Find all .webm files in directory
     webm_files = glob.glob(os.path.join(inDir, '*'))
@@ -113,9 +113,20 @@ def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_ou
         info = get_mp3_info(audio, sr)
         data.append([webm_file, img_filename, 'noise', 5, 'none', info["Duration (seconds)"], info["Frames"], info["Sampling Rate (Hz)"]])
 
+        # Augment the audio data
+        for j in range(num_augmentations):
+            augmented_audio = augment_audio(audio, sr)
+            augmented_filename = f"augmented_noise_sample_{i+1}_{j+1}"
+
+            augmented_img_filename = f"{outDir}/augmented_noise_sample_{i+1}_{j+1}.png"
+            get_spectrum(audio=augmented_audio, sr=sr, max_lenght=1, normalize=False, output_file=augmented_img_filename, plot_axis=False)
+
+            augmented_info = get_mp3_info(augmented_audio, sr)
+            data_augmented.append([augmented_filename, augmented_img_filename, 'augmented_noise', 5, 'none', augmented_info["Duration (seconds)"], augmented_info["Frames"], augmented_info["Sampling Rate (Hz)"]])
+
     # Create random combinations of noise samples
     num_combinations=len(webm_files)*10
-    for j in range(num_combinations):
+    for i in range(num_combinations):
         # Randomly select noise samples to combine
         file1, file2, file3, file4 = np.random.choice(webm_files, 4, replace=False)
         audio1, sr1 = librosa.load(file1, sr=samplingRate)
@@ -137,21 +148,38 @@ def prepareNoise(inDir="noise_data", outDir="spectrum_noise", csv_file='noise_ou
         if (random_number>8): combined_audio += audio4
 
         # Generate and save the spectrogram
-        combined_img_filename = f"{outDir}/combined_noise_sample_{j+1}.png"
+        combined_img_filename = f"{outDir}/combined_noise_sample_{i+1}.png"
         get_spectrum(audio=combined_audio, sr=samplingRate, max_lenght=1, normalize=False, output_file=combined_img_filename, plot_axis=False)
 
         # Collect combined noise sample info
         combined_info = get_mp3_info(combined_audio, samplingRate)
-        data.append([f"combined_noise_sample_{j+1}", combined_img_filename, 'combined_noise', 5, 'none', combined_info["Duration (seconds)"], combined_info["Frames"], combined_info["Sampling Rate (Hz)"]])
+        data.append([f"combined_noise_sample_{i+1}", combined_img_filename, 'combined_noise', 5, 'none', combined_info["Duration (seconds)"], combined_info["Frames"], combined_info["Sampling Rate (Hz)"]])
+
+        # Augment the audio data
+        for j in range(num_augmentations):
+            augmented_audio = augment_audio(combined_audio, sr)
+            augmented_filename = f"augmented_combined_noise_sample_{i+1}_{j+1}"
+
+            augmented_img_filename = f"{outDir}/augmented_combined_noise_sample_{i+1}_{j+1}.png"
+            get_spectrum(audio=augmented_audio, sr=sr, max_lenght=1, normalize=False, output_file=augmented_img_filename, plot_axis=False)
+
+            augmented_info = get_mp3_info(augmented_audio, sr)
+            data_augmented.append([augmented_filename, augmented_img_filename, 'augmented_combined_noise', 5, 'none', augmented_info["Duration (seconds)"], augmented_info["Frames"], augmented_info["Sampling Rate (Hz)"]])
 
     # Write data to CSV
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['filename', 'img_filename', 'sound', 'tone', 'speaker', 'Duration (seconds)', 'Frames', 'Sampling Rate (Hz)'])
         writer.writerows(data)
-
     print(f'CSV file "{csv_file}" has been created with {len(webm_files)} noise samples')
 
+    if(num_augmentations>0):
+        augmented_csv_file = csv_file.replace('.csv', '_augmented.csv')
+        with open(augmented_csv_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['filename', 'img_filename', 'sound', 'tone', 'speaker', 'Duration (seconds)','Frames','Sampling Rate (Hz)'])
+            writer.writerows(data_augmented)
+        print(f'CSV file "{augmented_csv_file}" has been created')
 
 def main():
     parser = argparse.ArgumentParser()

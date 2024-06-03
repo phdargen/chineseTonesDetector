@@ -149,6 +149,16 @@ const About = () => {
           [Catherine Ryu, Mandarin Tone Perception & Production Team, and Michigan State University Libraries. Tone Perfect: Multimodal Database for Mandarin Chinese. https://tone.lib.msu.edu/.]
           </Typography>
 
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+          Audio samples from the Tone Perfect dataset are standardized, high-quality, and from a limited set of speakers. 
+          To create a more diverse and realistic training sample, 
+          the original dataset is augmented by altering the audio speed without changing the pitch, 
+          shifting the audio forward or backward in time, changing the pitch without affecting speed, 
+          introducing random noise to simulate real-world conditions, adjusting the volume, 
+          and applying frequency and time masking to the audio's spectrogram. 
+          <br /> 
+          </Typography>
+
           </Paper>
           </Box>
       </Grid>
