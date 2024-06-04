@@ -20,7 +20,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from trainML.processAudio import make_spectrum
 samplingRate = 22050
-modelName = '../trainML/tfModelTones_v4'
+modelName = '../trainML/tfModelTones_v5'
 
 app = Flask(__name__)
 CORS(app, resources={

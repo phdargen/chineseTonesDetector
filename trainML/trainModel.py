@@ -92,8 +92,8 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
             augmented_data = pd.concat([augmented_data, augmented_noise_data], ignore_index=True)
             
         X_train = pd.concat([pd.Series(X_train), augmented_data['img_filename']], ignore_index=True)
-        y_train = pd.concat([pd.Series(y_train), label_encoder.transform(augmented_data['tone'])], ignore_index=True)
-        speakers_train = pd.concat([pd.Series(speakers_train), augmented_data['speaker']], ignore_index=True)
+        y_train = pd.concat([pd.Series(y_train), pd.Series(label_encoder.transform(augmented_data['tone']))], ignore_index=True)
+        speakers_train = pd.concat([pd.Series(speakers_train), pd.Series(augmented_data['speaker'])], ignore_index=True)
         print(f'Number of entries in training set after adding augmented data: {len(X_train)}')
 
     def check_distribution(name, tones, speakers):
@@ -300,10 +300,11 @@ def main():
     parser.add_argument('--modelName', type=str, default="tfModelTones", help="Model name")
     parser.add_argument('--addNoise', type=bool, default=False, help="Add noise category")
     parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
+    parser.add_argument('--augmentData', type=bool, default=False, help="Augment data")
 
     args = parser.parse_args()
 
-    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file)
+    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData)
 
 if __name__ == "__main__":
     main()
