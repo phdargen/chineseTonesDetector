@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms, datasets
-from transformers import ViTForImageClassification, ViTFeatureExtractor
+from transformers import ViTForImageClassification, ViTFeatureExtractor, ViTImageProcessor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
@@ -160,7 +160,23 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     #     test(model, device, test_loader, criterion)
 
 
+def test():
+    from transformers import ViTFeatureExtractor, ViTModel
+    from PIL import Image
+    import requests
 
+    url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
+    image = Image.open(requests.get(url, stream=True).raw)
+
+    processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
+    model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
+
+    inputs = processor(images=image, return_tensors="pt")
+    outputs = model(**inputs)
+    logits = outputs.logits
+    # model predicts one of the 1000 ImageNet classes
+    predicted_class_idx = logits.argmax(-1).item()
+    print("Predicted class:", model.config.id2label[predicted_class_idx])
 
 def main():
     parser = argparse.ArgumentParser()
@@ -170,10 +186,14 @@ def main():
     parser.add_argument('--addNoise', type=bool, default=False, help="Add noise category")
     parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
     parser.add_argument('--augmentData', type=bool, default=False, help="Augment data")
+    parser.add_argument('--test', action='store_true', help="Prepare example spectrograms")
 
     args = parser.parse_args()
 
-    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData)
+    if args.test:
+        test()
+    else:
+        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData)
 
 if __name__ == "__main__":
     main()
