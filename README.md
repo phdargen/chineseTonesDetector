@@ -12,6 +12,12 @@ pip install gTTS
 pip install soundfile
 ```
 
+### Fine tune base ML model
+```sh
+pip install torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+pip install transformers
+```
+
 ### download data samples
 ```sh
 cd prepareData
@@ -55,7 +61,7 @@ npm start
 
 
 ## AWS
-
+aws s3 sync s3://chinesetonesdata/noise_data noise_data
 
 
 
