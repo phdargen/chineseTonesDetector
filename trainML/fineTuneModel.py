@@ -17,6 +17,7 @@ import requests
 
 import logging
 logging.basicConfig(level=logging.INFO)
+import time
 
 # Model from https://huggingface.co/google/vit-base-patch16-224
 model_name = 'google/vit-base-patch16-224'
@@ -31,18 +32,6 @@ def compute_metrics(eval_pred):
         "accuracy": acc,
         "f1": f1,
     }
-
-class CustomCallback(TrainerCallback):
-    
-    def __init__(self, trainer) -> None:
-        super().__init__()
-        self._trainer = trainer
-    
-    def on_epoch_end(self, args, state, control, **kwargs):
-        if control.should_evaluate:
-            control_copy = deepcopy(control)
-            self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix="train@"+lang)
-            return control_copy
 
 class ImageDataset(Dataset):
     def __init__(self, image_paths, labels, transform=None):
@@ -77,9 +66,14 @@ def plot_example_image(dataset, index=0):
     #plt.show()
 
 # Load the CSV file and preprocess the data
-def load_data_from_csv(csv_file, add_noise=False, noise_csv=None):
+def load_data_from_csv(csv_file, addNoise=False, noise_csv=None, augmentData=False):
     data = pd.read_csv(csv_file)
     print(f'Number of entries in output csv: {data.shape[0]}')
+
+    # Add noise data
+    if(addNoise):
+        data = addData(data, noise_csv)
+        print(f'Number of entries after adding noise: {data.shape[0]}')
 
     file_paths = data['img_filename']
     tones = data['tone']
@@ -101,6 +95,21 @@ def load_data_from_csv(csv_file, add_noise=False, noise_csv=None):
     X_train, X_val, y_train, y_val, speakers_train, speakers_val = train_test_split(
         X_temp, y_temp, speakers_temp, test_size=0.2/0.9, random_state=42, stratify=y_temp)
 
+    # Add augmented data to training set
+    if augmentData:
+        augmented_csv_file = csv_file.replace('.csv', '_augmented.csv')
+        augmented_data = pd.read_csv(augmented_csv_file)
+        augmented_noise_csv_file = noise_csv.replace('.csv', '_augmented.csv')
+        
+        if addNoise:
+            augmented_noise_data = pd.read_csv(augmented_noise_csv_file)
+            augmented_data = pd.concat([augmented_data, augmented_noise_data], ignore_index=True)
+            
+        X_train = pd.concat([pd.Series(X_train), augmented_data['img_filename']], ignore_index=True)
+        y_train = pd.concat([pd.Series(y_train), pd.Series(label_encoder.transform(augmented_data['tone']))], ignore_index=True)
+        speakers_train = pd.concat([pd.Series(speakers_train), pd.Series(augmented_data['speaker'])], ignore_index=True)
+        print(f'Number of entries in training set after adding augmented data: {len(X_train)}')
+
     return X_train.reset_index(drop=True), X_val.reset_index(drop=True), X_test.reset_index(drop=True), y_train, y_val, y_test, num_classes
 
 def addData(data, csv_file):
@@ -120,9 +129,9 @@ def print_frozen_params(model):
     print(f"Total frozen parameters: {frozen_params}")
     print(f"Total trainable parameters: {trainable_params}")
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8):
 
-    # Load base model 
+    # Load feature extractor
     feature_extractor = ViTFeatureExtractor.from_pretrained(model_name)
 
     # Transform images
@@ -133,7 +142,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     ])
 
     # Create datasets
-    X_train, X_val, X_test, y_train, y_val, y_test, num_classes = load_data_from_csv(csv_file)
+    X_train, X_val, X_test, y_train, y_val, y_test, num_classes = load_data_from_csv(csv_file, addNoise, noise_csv, augmentData)
     train_dataset = ImageDataset(X_train, y_train, transform)
     val_dataset = ImageDataset(X_val, y_val, transform)
     test_dataset = ImageDataset(X_test, y_test, transform)
@@ -143,13 +152,15 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     print(f"Test dataset size: {len(X_test)}")
     plot_example_image(train_dataset)
 
-    ## Add new layer to finetune
+    ## Load base model and add new layer to finetune
     model = ViTForImageClassification.from_pretrained(model_name, num_labels=num_classes, ignore_mismatched_sizes=True)
 
     # Freeze base model weights
     for name, param in model.named_parameters():
         if 'classifier' not in name:  
             param.requires_grad = False
+        if unfreezeLastBaseLayer and 'encoder.layer.11' in name:
+            param.requires_grad = True
 
     # Print parameter info
     print("\nAfter modifying requires_grad:")
@@ -169,21 +180,20 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     # Init training
     training_args = TrainingArguments(
         output_dir='./results',          # output directory
-        num_train_epochs=10,              # number of training epochs
-        per_device_train_batch_size=8,   # batch size for training
-        per_device_eval_batch_size=8,    # batch size for evaluation
+        num_train_epochs=epochs,              # number of training epochs
+        per_device_train_batch_size=batch_size,   # batch size for training
+        per_device_eval_batch_size=batch_size,    # batch size for evaluation
         warmup_steps=500,                # number of warmup steps for learning rate scheduler
         weight_decay=0.01,               # strength of weight decay
         logging_dir='./logs',            # directory for storing logs
-        logging_steps=10,
+        logging_steps=100,
         save_total_limit=2,             # limit the total amount of checkpoints on disk
         remove_unused_columns=False,    # remove unused columns from the dataset
         push_to_hub=False,              # do not push the model to the hub
         report_to='tensorboard',        # report metrics to tensorboard
         load_best_model_at_end=True,    # load the best model at the end of training
         eval_strategy="epoch",          # evaluation strategy to adopt during training
-        save_steps=1000,                # number of update steps before saving checkpoint
-        eval_steps=1000,                # number of update steps before evaluating
+        save_strategy="epoch",
     )
 
     class CustomDataCollator:
@@ -206,7 +216,6 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
         data_collator=data_collator, 
         compute_metrics=compute_metrics,           
     )
-    trainer.add_callback(CustomCallback(trainer)) 
 
     # Train model
     training = trainer.train()
@@ -221,7 +230,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     print("Evaluate test sample ...")
     print(results)
 
-    trainer.save_model("./results/best_model")
+    trainer.save_model(f"./results/{modelName}")
 
     # Test predictions
     def load_image(image_path):
@@ -257,6 +266,8 @@ def test():
     print("Predicted class:", model.config.id2label[predicted_class_idx])
 
 def main():
+    start_time = time.time()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--csv_file', type=str, default="output.csv", help="CSV file name")
     parser.add_argument('--outDir', type=str, default="spectrum_data", help="Path to img dir")
@@ -265,13 +276,20 @@ def main():
     parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
     parser.add_argument('--augmentData', type=bool, default=False, help="Augment data")
     parser.add_argument('--test', action='store_true', help="Prepare example spectrograms")
+    parser.add_argument('--unfreezeLastBaseLayer', type=bool, default=False, help="Unfreeze last base layer")
+    parser.add_argument('--epochs', type=int, default=10, help="Epochs")
+    parser.add_argument('--batch_size', type=int, default=8, help="Batch size")
 
     args = parser.parse_args()
 
     if args.test:
         test()
     else:
-        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData)
+        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size)
+
+    end_time = time.time()
+    total_time = (end_time - start_time) / 60
+    print(f"This took: {total_time:.2f} minutes")
 
 if __name__ == "__main__":
     main()
