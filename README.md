@@ -16,6 +16,9 @@ pip install soundfile
 ```sh
 pip install torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
 pip install transformers
+pip install -U huggingface_hub
+pip install accelerate -U
+pip install tensorboard
 ```
 
 ### download data samples

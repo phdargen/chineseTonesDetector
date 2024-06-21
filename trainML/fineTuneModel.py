@@ -3,20 +3,51 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms, datasets
-from transformers import ViTForImageClassification, ViTFeatureExtractor, ViTImageProcessor
+from transformers import ViTForImageClassification, ViTFeatureExtractor, ViTImageProcessor, Trainer, TrainingArguments, DefaultDataCollator, DataCollatorWithPadding, TrainerCallback
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, f1_score
 
-import argparse
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import argparse
+from PIL import Image
+import requests
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
+# Model from https://huggingface.co/google/vit-base-patch16-224
 model_name = 'google/vit-base-patch16-224'
 image_resolution = 224
 
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+    acc = accuracy_score(labels, predictions)
+    f1 = f1_score(labels, predictions, average="macro")
+    return {
+        "accuracy": acc,
+        "f1": f1,
+    }
+
+class CustomCallback(TrainerCallback):
+    
+    def __init__(self, trainer) -> None:
+        super().__init__()
+        self._trainer = trainer
+    
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if control.should_evaluate:
+            control_copy = deepcopy(control)
+            self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix="train@"+lang)
+            return control_copy
+
 class ImageDataset(Dataset):
     def __init__(self, image_paths, labels, transform=None):
-        self.image_paths = image_paths
-        self.labels = labels
+        self.image_paths = list(image_paths)
+        self.labels = list(labels)
         self.transform = transform
 
     def __len__(self):
@@ -31,8 +62,20 @@ class ImageDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         
-        return image, label
-    
+        return {"pixel_values": image, "label": label}
+
+def plot_example_image(dataset, index=0):
+    example = dataset[index]
+    print("Example data keys:", example.keys())
+    image = example["pixel_values"]
+    label = example["label"]
+    image = image.permute(1, 2, 0)  # Change from CxHxW to HxWxC for plotting
+    #image = image * torch.tensor(feature_extractor.image_std).reshape(1, 1, 3) + torch.tensor(feature_extractor.image_mean).reshape(1, 1, 3)  # Unnormalize
+    image = image.numpy()
+    plt.imshow(image)
+    plt.title(f"Label: {label}")
+    #plt.show()
+
 # Load the CSV file and preprocess the data
 def load_data_from_csv(csv_file, add_noise=False, noise_csv=None):
     data = pd.read_csv(csv_file)
@@ -58,70 +101,31 @@ def load_data_from_csv(csv_file, add_noise=False, noise_csv=None):
     X_train, X_val, y_train, y_val, speakers_train, speakers_val = train_test_split(
         X_temp, y_temp, speakers_temp, test_size=0.2/0.9, random_state=42, stratify=y_temp)
 
-    return X_train, X_val, X_test, y_train, y_val, y_test, num_classes
+    return X_train.reset_index(drop=True), X_val.reset_index(drop=True), X_test.reset_index(drop=True), y_train, y_val, y_test, num_classes
 
 def addData(data, csv_file):
     noise_data = pd.read_csv(csv_file)
     return pd.concat([data, noise_data], ignore_index=True)
 
 def print_frozen_params(model):
+    frozen_params = 0
+    trainable_params = 0
     for name, param in model.named_parameters():
         if not param.requires_grad:
+            frozen_params += param.numel()
             print(f"Parameter {name} is frozen.")
         else:
+            trainable_params += param.numel()
             print(f"Parameter {name} is trainable.")
-
-def train(model, device, train_loader, criterion, optimizer, epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        outputs = model(data).logits
-        loss = criterion(outputs, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % 10 == 0:
-            print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} '
-                  f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-
-def test(model, device, test_loader, criterion):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            outputs = model(data).logits
-            test_loss += criterion(outputs, target).item() 
-            pred = outputs.argmax(dim=1, keepdim=True)  
-            correct += pred.eq(target.view_as(pred)).sum().item()
-
-    test_loss /= len(test_loader.dataset)
-    accuracy = 100. * correct / len(test_loader.dataset)
-    print(f'\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} '
-          f'({accuracy:.0f}%)\n')
-    return accuracy
+    print(f"Total frozen parameters: {frozen_params}")
+    print(f"Total trainable parameters: {trainable_params}")
 
 def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False):
 
     # Load base model 
-    model = ViTForImageClassification.from_pretrained(model_name, num_labels=5,ignore_mismatched_sizes=True)
     feature_extractor = ViTFeatureExtractor.from_pretrained(model_name)
 
-    # Print frozen parameters before training
-    print("Before training:")
-    print_frozen_params(model)
-
-    # Freeze base model weights
-    for name, param in model.named_parameters():
-        if 'classifier' not in name:  
-            param.requires_grad = False
-
-    # Print frozen parameters after modifying
-    print("\nAfter modifying requires_grad:")
-    print_frozen_params(model)
-
-    # Transform image
+    # Transform images
     transform = transforms.Compose([
         transforms.Resize((image_resolution, image_resolution)),
         transforms.ToTensor(),
@@ -134,9 +138,22 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     val_dataset = ImageDataset(X_val, y_val, transform)
     test_dataset = ImageDataset(X_test, y_test, transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=2, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=2, shuffle=False)
+    print(f"Training dataset size: {len(X_train)}")
+    print(f"Validation dataset size: {len(X_val)}")
+    print(f"Test dataset size: {len(X_test)}")
+    plot_example_image(train_dataset)
+
+    ## Add new layer to finetune
+    model = ViTForImageClassification.from_pretrained(model_name, num_labels=num_classes, ignore_mismatched_sizes=True)
+
+    # Freeze base model weights
+    for name, param in model.named_parameters():
+        if 'classifier' not in name:  
+            param.requires_grad = False
+
+    # Print parameter info
+    print("\nAfter modifying requires_grad:")
+    print_frozen_params(model)
 
     # Select backend
     if torch.cuda.is_available():
@@ -149,22 +166,83 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
         device = torch.device("cpu")
     model.to(device)
 
-    # Define optimizer
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.001)
-    criterion = nn.CrossEntropyLoss()
+    # Init training
+    training_args = TrainingArguments(
+        output_dir='./results',          # output directory
+        num_train_epochs=10,              # number of training epochs
+        per_device_train_batch_size=8,   # batch size for training
+        per_device_eval_batch_size=8,    # batch size for evaluation
+        warmup_steps=500,                # number of warmup steps for learning rate scheduler
+        weight_decay=0.01,               # strength of weight decay
+        logging_dir='./logs',            # directory for storing logs
+        logging_steps=10,
+        save_total_limit=2,             # limit the total amount of checkpoints on disk
+        remove_unused_columns=False,    # remove unused columns from the dataset
+        push_to_hub=False,              # do not push the model to the hub
+        report_to='tensorboard',        # report metrics to tensorboard
+        load_best_model_at_end=True,    # load the best model at the end of training
+        eval_strategy="epoch",          # evaluation strategy to adopt during training
+        save_steps=1000,                # number of update steps before saving checkpoint
+        eval_steps=1000,                # number of update steps before evaluating
+    )
 
-    # Train
-    num_epochs = 10
-    # for epoch in range(1, num_epochs + 1):
-    #     train(model, device, train_loader, criterion, optimizer, epoch)
-    #     test(model, device, test_loader, criterion)
+    class CustomDataCollator:
+        def __call__(self, features, debug=False):
+            pixel_values = torch.stack([feature["pixel_values"] for feature in features])
+            labels = torch.tensor([feature["label"] for feature in features])
+            if debug:
+                print(f"Batch pixel_values shape: {pixel_values.shape}")
+                print(f"Batch labels shape: {labels.shape}")
+                print(f"Batch labels: {labels}")
+            return {"pixel_values": pixel_values, "labels": labels}
+
+    data_collator = CustomDataCollator()
+
+    trainer = Trainer(
+        model=model,                         
+        args=training_args,                  
+        train_dataset=train_dataset,         
+        eval_dataset=val_dataset,    
+        data_collator=data_collator, 
+        compute_metrics=compute_metrics,           
+    )
+    trainer.add_callback(CustomCallback(trainer)) 
+
+    # Train model
+    training = trainer.train()
+    print(training)
+
+    # Evaluate model
+    results = trainer.evaluate(train_dataset)
+    print("Evaluate train sample ...")
+    print(results)
+
+    results = trainer.evaluate(test_dataset)
+    print("Evaluate test sample ...")
+    print(results)
+
+    trainer.save_model("./results/best_model")
+
+    # Test predictions
+    def load_image(image_path):
+        image = Image.open(image_path).convert("RGB")
+        image = transform(image)
+        return image
+
+    example_image_paths = ["spectrum_data/hong1_MV2.png", "spectrum_data/cao2_FV1.png", "spectrum_data/sa3_MV1.png", "spectrum_data/kai4_MV2.png"]
+    example_images = [load_image(image_path) for image_path in example_image_paths]
+    example_images_batch = torch.stack(example_images).to(model.device)
+
+    model.eval()
+    with torch.no_grad():
+        outputs = model(pixel_values=example_images_batch)
+        predictions = torch.argmax(outputs.logits, dim=-1)
+
+    for i, image_path in enumerate(example_image_paths):
+        print(f"Prediction for {image_path}: Class {predictions[i].item()}")
 
 
 def test():
-    from transformers import ViTFeatureExtractor, ViTModel
-    from PIL import Image
-    import requests
-
     url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
     image = Image.open(requests.get(url, stream=True).raw)
 
