@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms, datasets
-from transformers import ViTForImageClassification, ViTFeatureExtractor, ViTImageProcessor, Trainer, TrainingArguments, DefaultDataCollator, DataCollatorWithPadding, TrainerCallback
+from transformers import ViTForImageClassification, ViTFeatureExtractor, ViTImageProcessor, Trainer, TrainingArguments, DefaultDataCollator, TrainerCallback, EarlyStoppingCallback
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, f1_score
@@ -64,6 +64,35 @@ def plot_example_image(dataset, index=0):
     plt.imshow(image)
     plt.title(f"Label: {label}")
     #plt.show()
+
+class MyModel(nn.Module):
+    def __init__(self, base_model, num_labels):
+        super(MyModel, self).__init__()
+        self.base_model = base_model
+        self.classifier = nn.Sequential(
+            nn.Linear(base_model.config.hidden_size, 512),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(256, num_labels)
+        )
+
+    def forward(self, pixel_values):
+        outputs = self.base_model(pixel_values=pixel_values)
+        logits = self.classifier(outputs.mean(dim=1))  
+        return logits
+
+class CustomDataCollator:
+    def __call__(self, features, debug=False):
+        pixel_values = torch.stack([feature["pixel_values"] for feature in features])
+        labels = torch.tensor([feature["label"] for feature in features])
+        if debug:
+            print(f"Batch pixel_values shape: {pixel_values.shape}")
+            print(f"Batch labels shape: {labels.shape}")
+            print(f"Batch labels: {labels}")
+        return {"pixel_values": pixel_values, "labels": labels}
 
 # Load the CSV file and preprocess the data
 def load_data_from_csv(csv_file, addNoise=False, noise_csv=None, augmentData=False):
@@ -129,7 +158,7 @@ def print_frozen_params(model):
     print(f"Total frozen parameters: {frozen_params}")
     print(f"Total trainable parameters: {trainable_params}")
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8, addMoreLayers=False, resume_from_checkpoint=None):
 
     # Load feature extractor
     feature_extractor = ViTFeatureExtractor.from_pretrained(model_name)
@@ -153,7 +182,11 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     plot_example_image(train_dataset)
 
     ## Load base model and add new layer to finetune
-    model = ViTForImageClassification.from_pretrained(model_name, num_labels=num_classes, ignore_mismatched_sizes=True)
+    if addMoreLayers:
+        base_model = ViTForImageClassification.from_pretrained(model_name)
+        model = MyModel(base_model, num_labels=num_classes)
+    else:
+        model = ViTForImageClassification.from_pretrained(model_name, num_labels=num_classes, ignore_mismatched_sizes=True)
 
     # Freeze base model weights
     for name, param in model.named_parameters():
@@ -179,32 +212,30 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
 
     # Init training
     training_args = TrainingArguments(
-        output_dir='./results',          # output directory
-        num_train_epochs=epochs,              # number of training epochs
-        per_device_train_batch_size=batch_size,   # batch size for training
-        per_device_eval_batch_size=batch_size,    # batch size for evaluation
-        warmup_steps=500,                # number of warmup steps for learning rate scheduler
-        weight_decay=0.01,               # strength of weight decay
-        logging_dir='./logs',            # directory for storing logs
-        logging_steps=100,
-        save_total_limit=2,             # limit the total amount of checkpoints on disk
-        remove_unused_columns=False,    # remove unused columns from the dataset
-        push_to_hub=False,              # do not push the model to the hub
-        report_to='tensorboard',        # report metrics to tensorboard
-        load_best_model_at_end=True,    # load the best model at the end of training
-        eval_strategy="epoch",          # evaluation strategy to adopt during training
-        save_strategy="epoch",
-    )
+        output_dir='./results',      
+        logging_dir='./logs',            
+        
+        push_to_hub=False,              
+        #report_to='tensorboard',        
+        load_best_model_at_end=True,    
+        gradient_accumulation_steps=1,
+        remove_unused_columns=False,    
 
-    class CustomDataCollator:
-        def __call__(self, features, debug=False):
-            pixel_values = torch.stack([feature["pixel_values"] for feature in features])
-            labels = torch.tensor([feature["label"] for feature in features])
-            if debug:
-                print(f"Batch pixel_values shape: {pixel_values.shape}")
-                print(f"Batch labels shape: {labels.shape}")
-                print(f"Batch labels: {labels}")
-            return {"pixel_values": pixel_values, "labels": labels}
+        eval_strategy="epoch",          
+        save_strategy="epoch",
+        #save_total_limit=2,            
+
+        warmup_ratio=0.1,
+        lr_scheduler_type="cosine", # or linear?
+        metric_for_best_model="accuracy",
+
+        ## Hyperparameters to tune
+        per_device_train_batch_size=batch_size,   
+        per_device_eval_batch_size=batch_size,  
+        num_train_epochs=epochs,         
+        learning_rate=1e-5,
+        weight_decay=0.01,   # regularization
+    )
 
     data_collator = CustomDataCollator()
 
@@ -214,22 +245,26 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         train_dataset=train_dataset,         
         eval_dataset=val_dataset,    
         data_collator=data_collator, 
-        compute_metrics=compute_metrics,           
+        compute_metrics=compute_metrics,   
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]        
     )
 
     # Train model
-    training = trainer.train()
-    print(training)
+    if resume_from_checkpoint is not None:
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+    else:
+        trainer.train()
 
     # Evaluate model
-    results = trainer.evaluate(train_dataset)
-    print("Evaluate train sample ...")
+    print("Evaluate validation sample ...")
+    results = trainer.evaluate(val_dataset)
     print(results)
 
-    results = trainer.evaluate(test_dataset)
     print("Evaluate test sample ...")
+    results = trainer.evaluate(test_dataset)
     print(results)
 
+    print(f"Saving models as: ./results/{modelName}")
     trainer.save_model(f"./results/{modelName}")
 
     # Test predictions
@@ -238,7 +273,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         image = transform(image)
         return image
 
-    example_image_paths = ["spectrum_data/hong1_MV2.png", "spectrum_data/cao2_FV1.png", "spectrum_data/sa3_MV1.png", "spectrum_data/kai4_MV2.png"]
+    example_image_paths = ["spectrum_data/hong1_MV2.png", "spectrum_data/cao2_FV1.png", "spectrum_data/sa3_MV1.png", "spectrum_data/kai4_MV2.png", "spectrum_noise/noise_sample_28.png"]
     example_images = [load_image(image_path) for image_path in example_image_paths]
     example_images_batch = torch.stack(example_images).to(model.device)
 
@@ -248,7 +283,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         predictions = torch.argmax(outputs.logits, dim=-1)
 
     for i, image_path in enumerate(example_image_paths):
-        print(f"Prediction for {image_path}: Class {predictions[i].item()}")
+        print(f"Prediction for {image_path}: Tone {predictions[i].item()+1}")
 
 
 def test():
@@ -272,20 +307,37 @@ def main():
     parser.add_argument('--csv_file', type=str, default="output.csv", help="CSV file name")
     parser.add_argument('--outDir', type=str, default="spectrum_data", help="Path to img dir")
     parser.add_argument('--modelName', type=str, default="fineTunedModelTones", help="Model name")
-    parser.add_argument('--addNoise', type=bool, default=False, help="Add noise category")
+    parser.add_argument('--addNoise', action='store_true', help="Add noise category")
     parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
-    parser.add_argument('--augmentData', type=bool, default=False, help="Augment data")
+    parser.add_argument('--augmentData', action='store_true', help="Augment data")
     parser.add_argument('--test', action='store_true', help="Prepare example spectrograms")
-    parser.add_argument('--unfreezeLastBaseLayer', type=bool, default=False, help="Unfreeze last base layer")
+    parser.add_argument('--unfreezeLastBaseLayer', action='store_true', help="Unfreeze last base layer")
     parser.add_argument('--epochs', type=int, default=10, help="Epochs")
     parser.add_argument('--batch_size', type=int, default=8, help="Batch size")
+    parser.add_argument('--addMoreLayers', action='store_true', help="Add more layers")
+    parser.add_argument('--resume_from_checkpoint', type=str, default=None, help="Path to checkpoint directory")
 
     args = parser.parse_args()
+
+    print("Settings: ")
+    print(f"CSV File: {args.csv_file}")
+    print(f"Output Directory: {args.outDir}")
+    print(f"Model Name: {args.modelName}")
+    print(f"Add Noise: {args.addNoise}")
+    print(f"Noise CSV File: {args.noise_csv_file}")
+    print(f"Augment Data: {args.augmentData}")
+    print(f"Test Mode: {args.test}")
+    print(f"Unfreeze Last Base Layer: {args.unfreezeLastBaseLayer}")
+    print(f"Epochs: {args.epochs}")
+    print(f"Batch Size: {args.batch_size}")
+    print(f"Add More Layers: {args.addMoreLayers}")
+    print(f"Resume from checkpoint: {args.resume_from_checkpoint}")
+    print("")
 
     if args.test:
         test()
     else:
-        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size)
+        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size, args.addMoreLayers, args.resume_from_checkpoint)
 
     end_time = time.time()
     total_time = (end_time - start_time) / 60
