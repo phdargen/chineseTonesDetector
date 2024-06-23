@@ -7,6 +7,10 @@ from transformers import ViTForImageClassification, ViTFeatureExtractor, ViTImag
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.preprocessing import label_binarize
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import LogisticRegression
 
 import numpy as np
 import pandas as pd
@@ -34,17 +38,20 @@ def compute_metrics(eval_pred):
     }
 
 def plot_roc_curve(labels, probs, num_classes):
+    labels_bin = label_binarize(labels, classes=range(num_classes))
+    
     fpr = {}
     tpr = {}
     roc_auc = {}
 
     for i in range(num_classes):
-        fpr[i], tpr[i], _ = roc_curve(labels, probs[:, i], pos_label=i)
+        fpr[i], tpr[i], _ = roc_curve(labels_bin[:, i], probs[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-    plt.figure()
+    plt.figure(figsize=(10, 8))
     for i in range(num_classes):
         plt.plot(fpr[i], tpr[i], label=f'ROC curve (area = {roc_auc[i]:.2f}) for class {i}')
+    
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -52,54 +59,65 @@ def plot_roc_curve(labels, probs, num_classes):
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic (ROC) Curve')
     plt.legend(loc="lower right")
-    plt.show()
+    #plt.show()
+    plt.savefig('results/roc.png')
 
 def plot_confusion_matrix(labels, predictions, class_names):
-    cm = confusion_matrix(labels, predictions)
+    cm = confusion_matrix(labels, predictions,normalize='all')
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
-    disp.plot(cmap=plt.cm.Blues)
-    plt.show()
+    fig, ax = plt.subplots(figsize=(10, 8))
+    disp.plot(ax=ax, cmap=plt.cm.Blues)
+    plt.title('Confusion Matrix')
+    #plt.show()
+    plt.savefig('results/confusion.png')
 
 class TrainingMetricsCallback(TrainerCallback):
     def __init__(self):
         self.train_losses = []
         self.eval_losses = []
         self.eval_accuracies = []
-        self.epochs = []
-
-    def on_epoch_end(self, args, state, control, **kwargs):
-        if state.epoch not in self.epochs:
-            self.epochs.append(state.epoch)
+        self.steps = []
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         if logs is not None:
-            if 'loss' in logs and state.epoch >= len(self.train_losses):
+            step = state.global_step
+            self.steps.append(step)
+            
+            if 'loss' in logs:
                 self.train_losses.append(logs['loss'])
-            if 'eval_loss' in logs and state.epoch >= len(self.eval_losses):
+            if 'eval_loss' in logs:
                 self.eval_losses.append(logs['eval_loss'])
-            if 'eval_accuracy' in logs and state.epoch >= len(self.eval_accuracies):
+            if 'eval_accuracy' in logs:
                 self.eval_accuracies.append(logs['eval_accuracy'])
 
     def plot_metrics(self):
-        epochs = range(1, len(self.epochs) + 1)
+        if not self.steps:
+            print("No training steps recorded. Unable to plot metrics.")
+            return
+
         plt.figure(figsize=(12, 5))
 
-        plt.subplot(1, 2, 1)
-        plt.plot(epochs, self.train_losses, label='Training Loss')
-        plt.plot(epochs, self.eval_losses, label='Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.title('Training and Validation Loss')
+        if self.train_losses:
+            plt.subplot(1, 2, 1)
+            plt.plot(self.steps[:len(self.train_losses)], self.train_losses, label='Training Loss')
+            if self.eval_losses:
+                plt.plot(self.steps[:len(self.eval_losses)], self.eval_losses, label='Validation Loss')
+            plt.xlabel('Steps')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.title('Training and Validation Loss')
 
-        plt.subplot(1, 2, 2)
-        plt.plot(epochs, self.eval_accuracies, label='Validation Accuracy')
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.title('Validation Accuracy')
+        if self.eval_accuracies:
+            plt.subplot(1, 2, 2)
+            plt.plot(self.steps[:len(self.eval_accuracies)], self.eval_accuracies, label='Validation Accuracy')
+            plt.xlabel('Steps')
+            plt.ylabel('Accuracy')
+            plt.legend()
+            plt.title('Validation Accuracy')
 
-        plt.show()
+        plt.tight_layout()
+        #plt.show()
+        plt.savefig('results/metrics.png')
 
 
 class ImageDataset(Dataset):
@@ -338,7 +356,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     trainer.save_model(f"./results/{modelName}")
 
     # Plot training metrics
-    #metrics_callback.plot_metrics()
+    metrics_callback.plot_metrics()
 
     # Test predictions
     def load_image(image_path):
@@ -353,10 +371,20 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     model.eval()
     with torch.no_grad():
         outputs = model(pixel_values=example_images_batch)
-        predictions = torch.argmax(outputs.logits, dim=-1)
+        logits = outputs.logits
+        probabilities = torch.softmax(logits, dim=-1)
+        predictions = torch.argmax(logits, dim=-1)
 
+    print("Predicting examples ...")
     for i, image_path in enumerate(example_image_paths):
-        print(f"Prediction for {image_path}: Tone {predictions[i].item()+1}")
+        pred_tone = predictions[i].item() + 1
+        probs = probabilities[i].cpu().numpy() * 100 
+        print(f"Prediction for {image_path}:")
+        print(f"  Predicted Tone: {pred_tone}")
+        print("  Class Probabilities:")
+        for j, prob in enumerate(probs):
+            print(f"    Tone {j+1}: {prob:.2f}%")
+        print()
 
     # Make control plots
     all_labels = []
@@ -366,8 +394,9 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
         with torch.no_grad():
             outputs = model(pixel_values=batch["pixel_values"].to(device))
-            probs = torch.softmax(outputs, dim=1).cpu().numpy()
-            preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            logits = outputs.logits
+            probs = torch.softmax(logits, dim=-1).cpu().numpy()
+            preds = torch.argmax(logits, dim=-1).cpu().numpy()
             labels = batch["labels"].cpu().numpy()
 
         all_labels.extend(labels)
@@ -381,6 +410,74 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     plot_roc_curve(all_labels, all_probs, num_classes)
     plot_confusion_matrix(all_labels, all_preds, [str(i) for i in range(num_classes)])
 
+    # Calibration
+    model.eval()
+    all_val_labels = []
+    all_val_logits = []
+
+    for batch in DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator):
+        with torch.no_grad():
+            outputs = model(pixel_values=batch["pixel_values"].to(device))
+            logits = outputs.logits.cpu().numpy()
+            labels = batch["labels"].cpu().numpy()
+
+        all_val_labels.extend(labels)
+        all_val_logits.extend(logits)
+
+    all_val_labels = np.array(all_val_labels)
+    all_val_logits = np.array(all_val_logits)
+
+    # Fit the Logistic Regression model
+    lr = LogisticRegression(max_iter=1000)
+    lr.fit(all_val_logits, all_val_labels)
+
+    # Use Platt scaling for calibration
+    calibrator = CalibratedClassifierCV(estimator=lr, method='sigmoid', cv='prefit')
+    calibrator.fit(all_val_logits, all_val_labels)
+
+    # Save calibrated model
+    import joblib
+    joblib.dump(calibrator, f'./results/{modelName}_calibrator.pkl')
+
+    # Predict on the test set with calibration
+    all_test_labels = []
+    all_test_logits = []
+
+    for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
+        with torch.no_grad():
+            outputs = model(pixel_values=batch["pixel_values"].to(device))
+            logits = outputs.logits.cpu().numpy()
+            labels = batch["labels"].cpu().numpy()
+
+        all_test_labels.extend(labels)
+        all_test_logits.extend(logits)
+
+    all_test_labels = np.array(all_test_labels)
+    all_test_logits = np.array(all_test_logits)
+
+    # Apply calibration
+    calibrated_probs = calibrator.predict_proba(all_test_logits)
+    calibrated_preds = np.argmax(calibrated_probs, axis=1)
+
+    # Evaluate calibrated predictions
+    plot_roc_curve(all_test_labels, calibrated_probs, num_classes)
+    plot_confusion_matrix(all_test_labels, calibrated_preds, [str(i) for i in range(num_classes)])
+
+    accuracy = accuracy_score(all_test_labels, calibrated_preds)
+    f1 = f1_score(all_test_labels, calibrated_preds, average="macro")
+    print(f"Calibrated Accuracy: {accuracy:.4f}")
+    print(f"Calibrated F1 Score: {f1:.4f}")
+
+    # print("Predicting examples after calibration ...")
+    # for i, image_path in enumerate(example_image_paths):
+    #     pred_tone = predictions[i].item() + 1
+    #     probs = probabilities[i].cpu().numpy() * 100 
+    #     print(f"Prediction for {image_path}:")
+    #     print(f"  Predicted Tone: {pred_tone}")
+    #     print("  Class Probabilities:")
+    #     for j, prob in enumerate(probs):
+    #         print(f"    Tone {j+1}: {prob:.2f}%")
+    #     print()
 
 
 def test():
