@@ -10,6 +10,8 @@ pip install jupyter
 pip install requests numpy matplotlib librosa pandas seaborn tensorflow boto3
 pip install gTTS
 pip install soundfile
+pip install tensorflow-macos
+pip install tensorflow-metal
 ```
 
 ### Fine tune base ML model
@@ -19,6 +21,13 @@ pip install transformers
 pip install -U huggingface_hub
 pip install accelerate -U
 pip install tensorboard
+```
+
+### Train model
+```sh
+python trainModel.py --addNoise --augmentData --epochs=100 --batch_size=128 --modelName=tfModelTones_v6
+
+python fineTuneModel.py --addNoise --augmentData --epochs=2 --batch_size=64 --modelName=fineTunedModelTones_v1
 ```
 
 ### download data samples

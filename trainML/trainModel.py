@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import librosa.display
 import pandas as pd
 import seaborn as sns
+import time
 
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
@@ -19,8 +20,6 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 
 from processAudio import get_mp3_info, get_spectrum
 samplingRate = 22050
-EPOCHS = 10
-BATCH_SIZE = 128
 
 def plot_learning_curves(history):
     # Plot accuracy
@@ -48,7 +47,22 @@ def addData(data, csv_file):
     noise_data = pd.read_csv(csv_file)
     return pd.concat([data, noise_data], ignore_index=True)
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, epochs=10, batch_size=128, runOnGPU=False):
+
+    # Setup GPU 
+    print(tf.config.list_physical_devices('GPU'))
+    if not runOnGPU: 
+        tf.config.set_visible_devices([], 'GPU')
+    else:
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            try:
+                tf.config.experimental.set_memory_growth(gpus[0], True)
+                tf.config.experimental.set_visible_devices(gpus[0], 'GPU')
+                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+                print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            except RuntimeError as e:
+                print(e)
 
     # Extract file paths and tone labels
     data = pd.read_csv(csv_file)
@@ -120,6 +134,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     #plt.show()
 
     # Load training, validation, and test images
+    print("Preprocess data ...")
     X_train = np.array([load_and_preprocess_image(fp) for fp in X_train])
     X_val = np.array([load_and_preprocess_image(fp) for fp in X_val])
     X_test = np.array([load_and_preprocess_image(fp) for fp in X_test])
@@ -147,9 +162,10 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     # ])
 
     # Train model
+    print("Training model ...")
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
-    result = model.fit(X_train, y_train, epochs=EPOCHS, validation_data=(X_val, y_val), batch_size=BATCH_SIZE)
+    result = model.fit(X_train, y_train, epochs=epochs, validation_data=(X_val, y_val), batch_size=batch_size)
 
     model.save(modelName)
     # Convert the model to TFLite format
@@ -292,19 +308,39 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     plt.savefig('class_distribution.png')
 
 
-
 def main():
+    start_time = time.time()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--csv_file', type=str, default="output.csv", help="CSV file name")
     parser.add_argument('--outDir', type=str, default="spectrum_data", help="Path to img dir")
     parser.add_argument('--modelName', type=str, default="tfModelTones", help="Model name")
-    parser.add_argument('--addNoise', type=bool, default=False, help="Add noise category")
+    parser.add_argument('--addNoise', action='store_true', help="Add noise category")
     parser.add_argument('--noise_csv_file', type=str, default="noise.csv", help="Noise CSV file name")
-    parser.add_argument('--augmentData', type=bool, default=False, help="Augment data")
+    parser.add_argument('--augmentData', action='store_true', help="Augment data")
+    parser.add_argument('--epochs', type=int, default=10, help="Epochs")
+    parser.add_argument('--batch_size', type=int, default=128, help="Batch size")
+    parser.add_argument('--runOnGPU', action='store_true', help="Run on GPU")
 
     args = parser.parse_args()
+    
+    print("Settings: ")
+    print(f"CSV File: {args.csv_file}")
+    print(f"Output Directory: {args.outDir}")
+    print(f"Model Name: {args.modelName}")
+    print(f"Add Noise: {args.addNoise}")
+    print(f"Noise CSV File: {args.noise_csv_file}")
+    print(f"Augment Data: {args.augmentData}")
+    print(f"Epochs: {args.epochs}")
+    print(f"Batch Size: {args.batch_size}")
+    print(f"Run on GPU: {args.runOnGPU}")
+    print("")
 
-    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData)
+    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.epochs, args.batch_size, args.runOnGPU)
+
+    end_time = time.time()
+    total_time = (end_time - start_time) / 60
+    print(f"This took: {total_time:.2f} minutes")
 
 if __name__ == "__main__":
     main()

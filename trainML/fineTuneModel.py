@@ -33,6 +33,75 @@ def compute_metrics(eval_pred):
         "f1": f1,
     }
 
+def plot_roc_curve(labels, probs, num_classes):
+    fpr = {}
+    tpr = {}
+    roc_auc = {}
+
+    for i in range(num_classes):
+        fpr[i], tpr[i], _ = roc_curve(labels, probs[:, i], pos_label=i)
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    plt.figure()
+    for i in range(num_classes):
+        plt.plot(fpr[i], tpr[i], label=f'ROC curve (area = {roc_auc[i]:.2f}) for class {i}')
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+    plt.show()
+
+def plot_confusion_matrix(labels, predictions, class_names):
+    cm = confusion_matrix(labels, predictions)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.show()
+
+class TrainingMetricsCallback(TrainerCallback):
+    def __init__(self):
+        self.train_losses = []
+        self.eval_losses = []
+        self.eval_accuracies = []
+        self.epochs = []
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if state.epoch not in self.epochs:
+            self.epochs.append(state.epoch)
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs is not None:
+            if 'loss' in logs and state.epoch >= len(self.train_losses):
+                self.train_losses.append(logs['loss'])
+            if 'eval_loss' in logs and state.epoch >= len(self.eval_losses):
+                self.eval_losses.append(logs['eval_loss'])
+            if 'eval_accuracy' in logs and state.epoch >= len(self.eval_accuracies):
+                self.eval_accuracies.append(logs['eval_accuracy'])
+
+    def plot_metrics(self):
+        epochs = range(1, len(self.epochs) + 1)
+        plt.figure(figsize=(12, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs, self.train_losses, label='Training Loss')
+        plt.plot(epochs, self.eval_losses, label='Validation Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.title('Training and Validation Loss')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs, self.eval_accuracies, label='Validation Accuracy')
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.title('Validation Accuracy')
+
+        plt.show()
+
+
 class ImageDataset(Dataset):
     def __init__(self, image_paths, labels, transform=None):
         self.image_paths = list(image_paths)
@@ -238,6 +307,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     )
 
     data_collator = CustomDataCollator()
+    metrics_callback = TrainingMetricsCallback()
 
     trainer = Trainer(
         model=model,                         
@@ -246,7 +316,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         eval_dataset=val_dataset,    
         data_collator=data_collator, 
         compute_metrics=compute_metrics,   
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]        
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3), metrics_callback]        
     )
 
     # Train model
@@ -267,6 +337,9 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     print(f"Saving models as: ./results/{modelName}")
     trainer.save_model(f"./results/{modelName}")
 
+    # Plot training metrics
+    #metrics_callback.plot_metrics()
+
     # Test predictions
     def load_image(image_path):
         image = Image.open(image_path).convert("RGB")
@@ -284,6 +357,30 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
 
     for i, image_path in enumerate(example_image_paths):
         print(f"Prediction for {image_path}: Tone {predictions[i].item()+1}")
+
+    # Make control plots
+    all_labels = []
+    all_preds = []
+    all_probs = []
+
+    for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
+        with torch.no_grad():
+            outputs = model(pixel_values=batch["pixel_values"].to(device))
+            probs = torch.softmax(outputs, dim=1).cpu().numpy()
+            preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            labels = batch["labels"].cpu().numpy()
+
+        all_labels.extend(labels)
+        all_preds.extend(preds)
+        all_probs.extend(probs)
+
+    all_labels = np.array(all_labels)
+    all_preds = np.array(all_preds)
+    all_probs = np.array(all_probs)
+
+    plot_roc_curve(all_labels, all_probs, num_classes)
+    plot_confusion_matrix(all_labels, all_preds, [str(i) for i in range(num_classes)])
+
 
 
 def test():
