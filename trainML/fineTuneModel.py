@@ -11,6 +11,7 @@ from sklearn.metrics import roc_curve, auc, confusion_matrix, ConfusionMatrixDis
 from sklearn.preprocessing import label_binarize
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from sklearn.base import BaseEstimator, ClassifierMixin
 
 import numpy as np
 import pandas as pd
@@ -245,7 +246,7 @@ def print_frozen_params(model):
     print(f"Total frozen parameters: {frozen_params}")
     print(f"Total trainable parameters: {trainable_params}")
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8, addMoreLayers=False, resume_from_checkpoint=None):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8, addMoreLayers=False, resume_from_checkpoint=None, doCalibration=False):
 
     # Load feature extractor
     feature_extractor = ViTFeatureExtractor.from_pretrained(model_name)
@@ -390,94 +391,160 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     all_labels = []
     all_preds = []
     all_probs = []
+    all_logits = []
 
     for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
         with torch.no_grad():
             outputs = model(pixel_values=batch["pixel_values"].to(device))
             logits = outputs.logits
+            logits_converted = logits.cpu().numpy()
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
             preds = torch.argmax(logits, dim=-1).cpu().numpy()
             labels = batch["labels"].cpu().numpy()
 
-        all_labels.extend(labels)
+        all_logits.extend(logits_converted)
         all_preds.extend(preds)
         all_probs.extend(probs)
+        all_labels.extend(labels)
 
-    all_labels = np.array(all_labels)
+    all_logits = np.array(all_logits)
     all_preds = np.array(all_preds)
     all_probs = np.array(all_probs)
+    all_labels = np.array(all_labels)
 
     plot_roc_curve(all_labels, all_probs, num_classes)
     plot_confusion_matrix(all_labels, all_preds, [str(i) for i in range(num_classes)])
 
-    # Calibration
-    model.eval()
-    all_val_labels = []
-    all_val_logits = []
+    if doCalibration:
+        # Calibration
+        print("Calibrating probabilities...")
 
-    for batch in DataLoader(val_dataset, batch_size=batch_size, collate_fn=data_collator):
+        # Fit the Logistic Regression model
+        # lr = LogisticRegression(max_iter=1000)
+        # lr.fit(all_val_logits, all_val_labels)
+
+        # # Use Platt scaling for calibration
+        # calibrator = CalibratedClassifierCV(estimator=lr, method='sigmoid', cv='prefit')
+        # calibrator.fit(all_val_logits, all_val_labels)
+
+        from scipy.special import softmax
+        class SKLearnWrapper(BaseEstimator, ClassifierMixin):
+            def __init__(self, model):
+                self.model = model
+            
+            def fit(self, X, y):
+                return self
+            
+            def predict_proba(self, X):
+                return softmax(X, axis=1)
+        
+        base_classifier = SKLearnWrapper(model)
+        calibrated_classifier = CalibratedClassifierCV(base_classifier, cv='prefit', method='isotonic')
+        calibrated_classifier.fit(all_logits, all_labels)
+
+        # Save calibrated model
+        import joblib
+        joblib.dump(calibrated_classifier, f"./results/{modelName}_calibrated.joblib")
+        print(f"Saved calibrated model as: ./results/{modelName}_calibrated.joblib")
+
+        model.eval()
         with torch.no_grad():
-            outputs = model(pixel_values=batch["pixel_values"].to(device))
+            outputs = model(pixel_values=example_images_batch)
             logits = outputs.logits.cpu().numpy()
-            labels = batch["labels"].cpu().numpy()
+            calibrated_probabilities = calibrated_classifier.predict_proba(logits)
+            predictions = np.argmax(calibrated_probabilities, axis=-1)
 
-        all_val_labels.extend(labels)
-        all_val_logits.extend(logits)
+        print("Predicting examples with calibrated probabilities...")
+        for i, image_path in enumerate(example_image_paths):
+            pred_tone = predictions[i] + 1
+            probs = calibrated_probabilities[i] * 100 
+            print(f"Prediction for {image_path}:")
+            print(f"  Predicted Tone: {pred_tone}")
+            print("  Calibrated Class Probabilities:")
+            for j, prob in enumerate(probs):
+                print(f"    Tone {j+1}: {prob:.2f}%")
+            print()
 
-    all_val_labels = np.array(all_val_labels)
-    all_val_logits = np.array(all_val_logits)
+        # Make control plots with calibrated probabilities
+        all_labels = []
+        all_preds = []
+        all_probs = []
 
-    # Fit the Logistic Regression model
-    lr = LogisticRegression(max_iter=1000)
-    lr.fit(all_val_logits, all_val_labels)
+        for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
+            with torch.no_grad():
+                outputs = model(pixel_values=batch["pixel_values"].to(device))
+                logits = outputs.logits.cpu().numpy()
+                probs = calibrated_classifier.predict_proba(logits)
+                preds = np.argmax(probs, axis=-1)
+                labels = batch["labels"].cpu().numpy()
 
-    # Use Platt scaling for calibration
-    calibrator = CalibratedClassifierCV(estimator=lr, method='sigmoid', cv='prefit')
-    calibrator.fit(all_val_logits, all_val_labels)
+            all_labels.extend(labels)
+            all_preds.extend(preds)
+            all_probs.extend(probs)
 
-    # Save calibrated model
-    import joblib
-    joblib.dump(calibrator, f'./results/{modelName}_calibrator.pkl')
+        all_labels = np.array(all_labels)
+        all_preds = np.array(all_preds)
+        all_probs = np.array(all_probs)
 
-    # Predict on the test set with calibration
-    all_test_labels = []
-    all_test_logits = []
+        plot_roc_curve(all_labels, all_probs, num_classes)
+        plot_confusion_matrix(all_labels, all_preds, [str(i) for i in range(num_classes)])
 
-    for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
-        with torch.no_grad():
-            outputs = model(pixel_values=batch["pixel_values"].to(device))
-            logits = outputs.logits.cpu().numpy()
-            labels = batch["labels"].cpu().numpy()
+        # Plot calibration curve
+        from sklearn.calibration import calibration_curve
+        import matplotlib.pyplot as plt
 
-        all_test_labels.extend(labels)
-        all_test_logits.extend(logits)
+        plt.figure(figsize=(10, 10))
+        for i in range(num_classes):
+            prob_true, prob_pred = calibration_curve(all_labels == i, all_probs[:, i], n_bins=10)
+            plt.plot(prob_pred, prob_true, marker='o', label=f'Class {i+1}')
+        
+        plt.plot([0, 1], [0, 1], linestyle='--', label='Perfectly calibrated')
+        plt.xlabel('Mean predicted probability')
+        plt.ylabel('Fraction of positives')
+        plt.title('Calibration curve')
+        plt.legend()
+        plt.savefig(f"./results/{modelName}_calibration_curve.png")
+        plt.close()
 
-    all_test_labels = np.array(all_test_labels)
-    all_test_logits = np.array(all_test_logits)
+        # # Predict on the test set with calibration
+        # all_test_labels = []
+        # all_test_logits = []
 
-    # Apply calibration
-    calibrated_probs = calibrator.predict_proba(all_test_logits)
-    calibrated_preds = np.argmax(calibrated_probs, axis=1)
+        # for batch in DataLoader(test_dataset, batch_size=batch_size, collate_fn=data_collator):
+        #     with torch.no_grad():
+        #         outputs = model(pixel_values=batch["pixel_values"].to(device))
+        #         logits = outputs.logits.cpu().numpy()
+        #         labels = batch["labels"].cpu().numpy()
 
-    # Evaluate calibrated predictions
-    plot_roc_curve(all_test_labels, calibrated_probs, num_classes)
-    plot_confusion_matrix(all_test_labels, calibrated_preds, [str(i) for i in range(num_classes)])
+        #     all_test_labels.extend(labels)
+        #     all_test_logits.extend(logits)
 
-    accuracy = accuracy_score(all_test_labels, calibrated_preds)
-    f1 = f1_score(all_test_labels, calibrated_preds, average="macro")
-    print(f"Calibrated Accuracy: {accuracy:.4f}")
-    print(f"Calibrated F1 Score: {f1:.4f}")
+        # all_test_labels = np.array(all_test_labels)
+        # all_test_logits = np.array(all_test_logits)
 
-    # print("Predicting examples after calibration ...")
-    # for i, image_path in enumerate(example_image_paths):
-    #     pred_tone = predictions[i].item() + 1
-    #     probs = probabilities[i].cpu().numpy() * 100 
-    #     print(f"Prediction for {image_path}:")
-    #     print(f"  Predicted Tone: {pred_tone}")
-    #     print("  Class Probabilities:")
-    #     for j, prob in enumerate(probs):
-    #         print(f"    Tone {j+1}: {prob:.2f}%")
-    #     print()
+        # # Apply calibration
+        # calibrated_probs = calibrator.predict_proba(all_test_logits)
+        # calibrated_preds = np.argmax(calibrated_probs, axis=1)
+
+        # # Evaluate calibrated predictions
+        # plot_roc_curve(all_test_labels, calibrated_probs, num_classes)
+        # plot_confusion_matrix(all_test_labels, calibrated_preds, [str(i) for i in range(num_classes)])
+
+        # accuracy = accuracy_score(all_test_labels, calibrated_preds)
+        # f1 = f1_score(all_test_labels, calibrated_preds, average="macro")
+        # print(f"Calibrated Accuracy: {accuracy:.4f}")
+        # print(f"Calibrated F1 Score: {f1:.4f}")
+
+        # print("Predicting examples after calibration ...")
+        # for i, image_path in enumerate(example_image_paths):
+        #     pred_tone = predictions[i].item() + 1
+        #     probs = probabilities[i].cpu().numpy() * 100 
+        #     print(f"Prediction for {image_path}:")
+        #     print(f"  Predicted Tone: {pred_tone}")
+        #     print("  Class Probabilities:")
+        #     for j, prob in enumerate(probs):
+        #         print(f"    Tone {j+1}: {prob:.2f}%")
+        #     print()
 
 
 def test():

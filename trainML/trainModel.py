@@ -47,7 +47,7 @@ def addData(data, csv_file):
     noise_data = pd.read_csv(csv_file)
     return pd.concat([data, noise_data], ignore_index=True)
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, epochs=10, batch_size=128, runOnGPU=False):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, epochs=10, batch_size=128, N_hiddenLayers = 3, image_resolution=128, runOnGPU=False):
 
     # Setup GPU 
     print(tf.config.list_physical_devices('GPU'))
@@ -121,7 +121,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     check_distribution("Test", y_test, speakers_test)
 
     def load_and_preprocess_image(file_path):
-        img = tf.keras.preprocessing.image.load_img(file_path, target_size=(128, 128))
+        img = tf.keras.preprocessing.image.load_img(file_path, target_size=(image_resolution, image_resolution))
         img = tf.keras.preprocessing.image.img_to_array(img)
         img = img / 255.0
         return img
@@ -140,24 +140,23 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     X_test = np.array([load_and_preprocess_image(fp) for fp in X_test])
 
     # Define model
-    N_hiddenLayers = 3
     model = Sequential()
-    model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)))
+    model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(image_resolution, image_resolution, 3)))
     model.add(MaxPooling2D(2, 2))
     for _ in range(N_hiddenLayers):
         model.add(Conv2D(64, (3, 3), activation='relu'))
         model.add(MaxPooling2D(2, 2))
     model.add(Flatten())
-    model.add(Dense(128, activation='relu'))
+    model.add(Dense(image_resolution, activation='relu'))
     model.add(Dense(num_classes, activation='softmax'))
 
-    # model = Sequential([
-    #     Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
+    # model2 = Sequential([
+    #     Conv2D(32, (3, 3), activation='relu', input_shape=(image_resolution, image_resolution, 3)),
     #     MaxPooling2D(2, 2),
     #     Conv2D(64, (3, 3), activation='relu'),
     #     MaxPooling2D(2, 2),
     #     Flatten(),
-    #     Dense(128, activation='relu'),
+    #     Dense(image_resolution, activation='relu'),
     #     Dense(num_classes, activation='softmax')
     # ])
 
@@ -321,6 +320,8 @@ def main():
     parser.add_argument('--epochs', type=int, default=10, help="Epochs")
     parser.add_argument('--batch_size', type=int, default=128, help="Batch size")
     parser.add_argument('--runOnGPU', action='store_true', help="Run on GPU")
+    parser.add_argument('--nHiddenLayers', type=int, default=3, help="Number of hidden layers")
+    parser.add_argument('--image_resolution', type=int, default=128, help="Image resolution")
 
     args = parser.parse_args()
     
@@ -334,9 +335,11 @@ def main():
     print(f"Epochs: {args.epochs}")
     print(f"Batch Size: {args.batch_size}")
     print(f"Run on GPU: {args.runOnGPU}")
+    print(f"Number of hidden layers: {args.nHiddenLayers}")
+    print(f"Image resolution: {args.image_resolution}")
     print("")
 
-    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.epochs, args.batch_size, args.runOnGPU)
+    trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.epochs, args.batch_size, args.nHiddenLayers, args.image_resolution, args.runOnGPU)
 
     end_time = time.time()
     total_time = (end_time - start_time) / 60

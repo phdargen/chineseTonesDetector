@@ -25,9 +25,9 @@ pip install tensorboard
 
 ### Train model
 ```sh
-python trainModel.py --addNoise --augmentData --epochs=100 --batch_size=128 --modelName=tfModelTones_v6
+python trainModel.py --addNoise --augmentData --epochs=10 --nHiddenLayers=3 --image_resolution=128 --batch_size=128  --modelName=tfModelTones_v7
 
-python fineTuneModel.py --addNoise --augmentData --epochs=2 --batch_size=64 --modelName=fineTunedModelTones_v1
+python fineTuneModel.py --addNoise --augmentData --unfreezeLastBaseLayer --epochs=2 --batch_size=64 --modelName=fineTunedModelTones_v1
 ```
 
 ### download data samples
