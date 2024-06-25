@@ -67,6 +67,8 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     # Extract file paths and tone labels
     data = pd.read_csv(csv_file)
     print(f'Number of entries in output csv: {data.shape[0]}')
+    durations = data['Duration (seconds)']
+    print(f'Total duration of audion samples: {durations.sum()/60/60} h')
 
     # Add noise data
     if(addNoise):
@@ -120,24 +122,50 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     check_distribution("Validation", y_val, speakers_val)
     check_distribution("Test", y_test, speakers_test)
 
+    # Preprocess images
     def load_and_preprocess_image(file_path):
-        img = tf.keras.preprocessing.image.load_img(file_path, target_size=(image_resolution, image_resolution))
-        img = tf.keras.preprocessing.image.img_to_array(img)
-        img = img / 255.0
+        img = tf.io.read_file(file_path)
+        img = tf.image.decode_png(img, channels=3) 
+        img = tf.image.resize(img, [image_resolution, image_resolution])
+        img = tf.cast(img, tf.float32) / 255.0
         return img
 
     # Test with sample image
-    #sample_image = load_and_preprocess_image(file_paths[0])
-    #plt.figure(figsize=(6, 6))
-    #plt.imshow(sample_image)
-    #plt.axis('off')
+    sample_image = load_and_preprocess_image(file_paths[0])
+    plt.figure(figsize=(6, 6))
+    plt.imshow(sample_image)
+    plt.axis('off')
     #plt.show()
+    plt.savefig('test_image.png')
 
-    # Load training, validation, and test images
-    print("Preprocess data ...")
-    X_train = np.array([load_and_preprocess_image(fp) for fp in X_train])
-    X_val = np.array([load_and_preprocess_image(fp) for fp in X_val])
-    X_test = np.array([load_and_preprocess_image(fp) for fp in X_test])
+    # Create datasets 
+    print("Create datasets ...")
+    train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train))
+    val_dataset = tf.data.Dataset.from_tensor_slices((X_val, y_val))
+    test_dataset = tf.data.Dataset.from_tensor_slices((X_test, y_test))
+
+    def process_path_and_label(file_path, label):
+        return load_and_preprocess_image(file_path), label
+
+    AUTOTUNE = tf.data.AUTOTUNE
+    train_dataset = (train_dataset
+                    .map(process_path_and_label, num_parallel_calls=AUTOTUNE)
+                    .cache()
+                    .shuffle(buffer_size=1000)
+                    .batch(batch_size)
+                    .prefetch(AUTOTUNE))
+
+    val_dataset = (val_dataset
+                .map(process_path_and_label, num_parallel_calls=AUTOTUNE)
+                .cache()
+                .batch(batch_size)
+                .prefetch(AUTOTUNE))
+
+    test_dataset = (test_dataset
+                    .map(process_path_and_label, num_parallel_calls=AUTOTUNE)
+                    .cache()
+                    .batch(batch_size)
+                    .prefetch(AUTOTUNE))
 
     # Define model
     model = Sequential()
@@ -150,44 +178,33 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     model.add(Dense(image_resolution, activation='relu'))
     model.add(Dense(num_classes, activation='softmax'))
 
-    # model2 = Sequential([
-    #     Conv2D(32, (3, 3), activation='relu', input_shape=(image_resolution, image_resolution, 3)),
-    #     MaxPooling2D(2, 2),
-    #     Conv2D(64, (3, 3), activation='relu'),
-    #     MaxPooling2D(2, 2),
-    #     Flatten(),
-    #     Dense(image_resolution, activation='relu'),
-    #     Dense(num_classes, activation='softmax')
-    # ])
-
     # Train model
     print("Training model ...")
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
-    result = model.fit(X_train, y_train, epochs=epochs, validation_data=(X_val, y_val), batch_size=batch_size)
+    result = model.fit(train_dataset, epochs=epochs, validation_data=val_dataset, batch_size=batch_size)
 
+    # Save model
     model.save(modelName)
-    # Convert the model to TFLite format
+    print(f"Model saved as {modelName}")
+
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     tflite_model = converter.convert()
-
-    # Save the converted model to a file
     tflite_model_name = 'my_model.tflite'
     with open(tflite_model_name, 'wb') as f:
         f.write(tflite_model)
-
-    print(f"Model saved as {tflite_model_name}")
+    print(f"TFLite model saved as {tflite_model_name}")
 
     # Print performance
-    loss, accuracy = model.evaluate(X_test, y_test)
+    loss, accuracy = model.evaluate(test_dataset)
     print(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy:.4f}")
-
     plot_learning_curves(result)
 
     # Predict for example file
     example_image_file = f"{outDir}/ao4_MV3.png"  
     example_image = load_and_preprocess_image(example_image_file)
     predictions = model.predict(np.expand_dims(example_image, axis=0))
+    print(f"Inference for example image: {example_image_file}")
     print(f"Predictions: {predictions}")
 
     # Get probabilities
@@ -203,8 +220,20 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
         print(f"Class: {class_name}, Probability: {probability:.4f}")
 
     # Get predicted probabilities for test set
-    predicted_probabilities = model.predict(X_test)
-    true_labels = y_test
+    predicted_probabilities = []
+    true_labels = []
+
+    for images, labels in test_dataset:
+        batch_predictions = model.predict(images)
+        predicted_probabilities.append(batch_predictions)
+        true_labels.append(labels)
+
+    predicted_probabilities = np.concatenate(predicted_probabilities, axis=0)
+    true_labels = np.concatenate(true_labels, axis=0)
+
+    print("Shape of predicted_probabilities:", predicted_probabilities.shape)
+    print("Shape of true_labels:", true_labels.shape)
+    print("Unique values in true_labels:", np.unique(true_labels))
 
     # Compute ROC curve and AUC for each class 
     fpr = dict()
@@ -213,9 +242,10 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
 
     num_classes = len(class_names)  
     for i in range(num_classes):
-        fpr[i], tpr[i], _ = roc_curve(true_labels == i, predicted_probabilities[:, i])
+        true_labels_binary = (true_labels == i).astype(int)
+        fpr[i], tpr[i], _ = roc_curve(true_labels_binary, predicted_probabilities[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
-
+        
     # Plot ROC curves
     plt.figure(figsize=(8, 6))
     for i in range(num_classes):
@@ -229,39 +259,9 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     plt.legend(loc='lower right')
     plt.savefig('roc.png')
 
-    audio_file = "../website/temp_audio.wav"
-    audio, sr = librosa.load(audio_file, sr=samplingRate)
-    info = get_mp3_info(audio,sr)
-    print("MP3 File Information:")
-    for key, value in info.items():
-        print(f"{key}: {value}")
-
-    plt.figure(figsize=(10, 6))
-    get_spectrum(audio=audio,output_file="test.png",sr=sr,max_lenght=1,normalize=False,plot_axis=False)
-    example_image = load_and_preprocess_image("test.png")
-    predictions = model.predict(np.expand_dims(example_image, axis=0))
-    highest_index = np.argmax(predictions)
-    print(f"Predictions: {predictions}")
-    print(f"The highest prediction is for tone: {highest_index+1}")
-
-    yt, index = librosa.effects.trim(audio, top_db=30, ref=np.max, frame_length=2048, hop_length=512)
-    info = get_mp3_info(yt,sr)
-    print("MP3 Trimmed File Information:")
-    for key, value in info.items():
-        print(f"{key}: {value}")
-
-    plt.figure(figsize=(10, 6))
-    get_spectrum(audio=yt,output_file="test2.png",sr=sr,max_lenght=1,normalize=False,plot_axis=False)
-    example_image = load_and_preprocess_image("test2.png")
-    predictions = model.predict(np.expand_dims(example_image, axis=0))
-    highest_index = np.argmax(predictions)
-    print(f"Predictions: {predictions}")
-    print(f"The highest prediction is for tone: {highest_index+1}")
-
     # Confusion matrix
-    y_pred = model.predict(X_test)
-    y_pred_classes = np.argmax(y_pred, axis=1)
-    y_true = y_test
+    y_pred_classes = np.argmax(predicted_probabilities, axis=1)
+    y_true = true_labels
 
     cm = confusion_matrix(y_true, y_pred_classes)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Tone 1', 'Tone 2', 'Tone 3', 'Tone 4', 'Other'])
@@ -273,7 +273,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
 
     # Extract predictions for the "Other" class
     other_class_index = 4
-    other_class_predictions = y_pred[:, other_class_index]
+    other_class_predictions = predicted_probabilities[:, other_class_index]
     other_class_true = (y_true == other_class_index).astype(int)
 
     # Threshold analysis
@@ -295,17 +295,6 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     plt.title('Threshold Analysis for "Other" Class')
     plt.legend()
     plt.savefig('Threshold.png')
-
-    # Check Class Distribution
-    unique, counts = np.unique(y_train, return_counts=True)
-    class_distribution = dict(zip(['Tone 1', 'Tone 2', 'Tone 3', 'Tone 4', 'Other'], counts))
-
-    plt.bar(class_distribution.keys(), class_distribution.values())
-    plt.title('Class Distribution in Training Data')
-    plt.xlabel('Class')
-    plt.ylabel('Count')
-    plt.savefig('class_distribution.png')
-
 
 def main():
     start_time = time.time()
