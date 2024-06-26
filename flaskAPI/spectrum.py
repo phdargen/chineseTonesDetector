@@ -26,8 +26,10 @@ if parent_dir not in sys.path:
 from trainML.processAudio import make_spectrum
 
 samplingRate = 22050
-image_resolution = 224
-modelNameCNN = '../trainML/tfModelTones_v8'
+
+image_resolutionCNN = 128
+image_resolutionViT = 224
+modelNameCNN = '../trainML/tfModelTones_v5'
 modelNameViT = '../trainML/results/fineTunedModelTones_v1/'
 base_model_name = 'google/vit-base-patch16-224'
 
@@ -61,7 +63,7 @@ def load_and_preprocess_image(file_path, model_type='CNN'):
     if model_type == 'CNN':
         img = tf.io.read_file(file_path)
         img = tf.image.decode_png(img, channels=3) 
-        img = tf.image.resize(img, [image_resolution, image_resolution])
+        img = tf.image.resize(img, [image_resolutionCNN, image_resolutionCNN])
         img = tf.cast(img, tf.float32) / 255.0
         return img
     else:
