@@ -1,6 +1,25 @@
-# chineseTonesDetector
+# ChineseTonesDetector
 
-## Download files
+Machine learning project to help practice correct Mandarin Chinese tone pronounciation.
+
+The 'Tone Perfect' dataset from Michigan State University is used for the training.
+It includes the full catalog of monosyllabic sounds in Mandarin Chinese in all four tones, spoken by six native Mandarin speakers.
+The collection is comprised of about 10k samples with a total duration of approximately 2 hours.
+To create a more diverse and realistic training sample, the original dataset is augmented.
+The audion samples are then converted to Mel spectrograms as input for image classification algorithms. 
+
+Both a CNN model and a fine-tuned Vision Transformer (based on Google's 'vit-base-patch16-224') model are trained.
+More details and deployed models for inference can be found here: https://pingulino.vercel.app/
+
+## Example spectrograms
+
+![ma1_FV1](https://github.com/phdargen/chineseTonesDetector/assets/29732335/e3906d99-6bf0-4e13-9c80-70fadc1d3238)
+![ma2_FV1](https://github.com/phdargen/chineseTonesDetector/assets/29732335/9cd972f7-3ca1-4ecb-9830-cd00264e1940)
+
+![ma3_FV1](https://github.com/phdargen/chineseTonesDetector/assets/29732335/64657bdf-9dbc-424b-925b-c85bca40dca1)
+![ma4_FV1](https://github.com/phdargen/chineseTonesDetector/assets/29732335/5c210d00-b805-4a6d-a767-519ad09d93d8)
+
+ Download files
 
 ### setup environment
 ```sh
