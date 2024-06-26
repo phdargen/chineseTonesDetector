@@ -9,18 +9,27 @@ import matplotlib.pyplot as plt
 from pydub import AudioSegment
 import tensorflow as tf
 
+import joblib
+from transformers import ViTFeatureExtractor, ViTForImageClassification
+import torch
+from PIL import Image
+
 import boto3
 import random
 import re
-
 import sys
 import os
+
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from trainML.processAudio import make_spectrum
+
 samplingRate = 22050
-modelName = '../trainML/tfModelTones_v5'
+image_resolution = 224
+modelNameCNN = '../trainML/tfModelTones_v8'
+modelNameViT = '../trainML/results/fineTunedModelTones_v1/'
+base_model_name = 'google/vit-base-patch16-224'
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -37,14 +46,28 @@ bucket_name = 'chinesetonesdata'
 #bucket_folder = 'noise_data'
 bucket_folder = 'user_data'
 
-# load tf model   
-model = tf.keras.models.load_model(modelName)
+# Load CNN model
+modelCNN = tf.keras.models.load_model(modelNameCNN)
 
-def load_and_preprocess_image(file_path):
-    img = tf.keras.preprocessing.image.load_img(file_path, target_size=(128, 128))
-    img = tf.keras.preprocessing.image.img_to_array(img)
-    img = img / 255.0
-    return img
+# Load ViT model
+modelViT = ViTForImageClassification.from_pretrained(modelNameViT)
+feature_extractor = ViTFeatureExtractor.from_pretrained(base_model_name)
+try:
+    calibrated_classifierViT = joblib.load("x.joblib")
+except:
+    calibrated_classifierViT = None
+
+def load_and_preprocess_image(file_path, model_type='CNN'):
+    if model_type == 'CNN':
+        img = tf.io.read_file(file_path)
+        img = tf.image.decode_png(img, channels=3) 
+        img = tf.image.resize(img, [image_resolution, image_resolution])
+        img = tf.cast(img, tf.float32) / 255.0
+        return img
+    else:
+        image = Image.open(file_path).convert("RGB")
+        inputs = feature_extractor(images=image, return_tensors="pt")
+        return inputs['pixel_values']
 
 @app.route('/')
 def home():
@@ -60,6 +83,9 @@ def get_spectrum():
     app.logger.debug('Body: %s', request.data)
     app.logger.debug('Files: %s', request.files)
     
+    model_type = request.form.get('model_type', 'CNN')
+    app.logger.debug('Model: %s', model_type)
+
     try:
         audio_data = request.files["audio"]
         audio_format = audio_data.content_type.split('/')[-1]  
@@ -102,10 +128,26 @@ def get_spectrum():
         img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
 
     ## Predict tone
-    # Predict for example file
-    input_image = load_and_preprocess_image('input.png')
-    predictions = model.predict(np.expand_dims(input_image, axis=0))
+    predictionsCNN = 0
+    predictionsVit = 0
+
+    if model_type == 'CNN' or model_type == 'Ensemble':
+        input_image = load_and_preprocess_image('input.png', 'CNN')
+        predictionsCNN = modelCNN.predict(np.expand_dims(input_image, axis=0))
+    if model_type == 'ViT' or model_type == 'Ensemble':
+        with torch.no_grad():
+            input_image = load_and_preprocess_image('input.png', 'ViT')
+            outputs = modelViT(pixel_values=input_image)
+            logits = outputs.logits
+            predictionsVit = torch.softmax(logits, dim=-1).numpy()
+
+    if model_type == 'Ensemble':
+        print(f"Predictions CNN: {predictionsCNN}")
+        print(f"Predictions ViT: {predictionsVit}")
+
+    predictions = predictionsCNN if model_type == 'CNN' else (predictionsVit if model_type == 'ViT' else (predictionsCNN + predictionsVit)/2)
     highest_index = np.argmax(predictions)
+
     print(f"Predictions: {predictions}")
     print(f"The highest prediction is for tone: {highest_index+1}")
 

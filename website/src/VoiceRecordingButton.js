@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import RecordRTC from 'recordrtc';
 import AudioPlayer from 'react-audio-player';
-import { Box, Button, Paper, Typography, LinearProgress } from '@mui/material';
+import { Box, Button, Paper, Typography, LinearProgress, Select, MenuItem } from '@mui/material';
 import { useTheme, useMediaQuery } from '@mui/material';
 
 import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
@@ -13,8 +13,8 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 const convertToPinyin = require('./convertToPinyin');
 
 // API
-//const api_url = 'http://localhost:5000/api/'
-const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
+const api_url = 'http://localhost:5000/api/'
+//const api_url = 'https://8q3aqjs3v1.execute-api.us-east-2.amazonaws.com/prod/api/'
 
 // Maximum recording time in seconds
 const MAX_RECORDING_TIME = 1; 
@@ -149,10 +149,19 @@ const VoiceRecordingButton = () => {
     return () => clearInterval(interval); 
   }, [isRecording,stopRecording]);
 
+  // ML model selector
+  const [modelType, setModelType] = useState('CNN');
+  const handleModelChange = (event) => {
+      setModelType(event.target.value);
+  };
+  
+  // Get spectrum and ML prediction
   const fetchSpectrum = async (audioData) => {
     try {
       const formData = new FormData();
       formData.append('audio', audioData); 
+      formData.append('model_type', modelType);
+
       console.log('audioData ', audioData)
       console.log('formData ', formData)
 
@@ -282,6 +291,19 @@ return (
           Press  <strong>"Play"</strong> to repeat the reference audio sample and see how the ideal mel spectrogram should look.  <br/>
 
           </Typography>
+
+          </Paper>
+    </Box>
+
+    <Box mb={2} width={isMobile ? '100%' : '50%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Choose machine learning model </Typography>
+
+          <Select value={modelType} onChange={handleModelChange} fullWidth style={{ marginTop: '16px' }} >
+            <MenuItem value="CNN">Convolutional neural network</MenuItem>
+            <MenuItem value="ViT">Fine-tuned vision transformer</MenuItem>
+            <MenuItem value="Ensemble">Ensemble</MenuItem>
+          </Select>
 
           </Paper>
     </Box>

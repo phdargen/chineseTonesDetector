@@ -13,6 +13,8 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import classification_report
 from sklearn.preprocessing import label_binarize
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import brier_score_loss
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
@@ -21,6 +23,53 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from processAudio import get_mp3_info, get_spectrum
 samplingRate = 22050
 
+# Probability calibration
+class TemperatureScaling(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(TemperatureScaling, self).__init__(**kwargs)
+        self.temperature = tf.Variable(initial_value=1.0, trainable=True, dtype=tf.float32)
+    
+    def call(self, logits):
+        return logits / self.temperature
+
+def nll_loss(y_true, y_pred):
+    return tf.reduce_mean(tf.losses.sparse_categorical_crossentropy(y_true, y_pred))
+
+def plot_calibration_curve(y_true, y_prob, num_classes, n_bins=10):
+    plt.figure(figsize=(10, 5))
+    
+    for i in range(num_classes):
+        y_true_binary = (y_true == i).astype(int)
+        y_prob_binary = y_prob[:, i]
+        
+        prob_true, prob_pred = calibration_curve(y_true_binary, y_prob_binary, n_bins=n_bins, strategy='uniform')
+        
+        plt.plot(prob_pred, prob_true, marker='o', label=f'Class {i}')
+    
+    plt.plot([0, 1], [0, 1], linestyle='--', label='Perfectly calibrated')
+    plt.xlabel('Mean Predicted Probability')
+    plt.ylabel('Fraction of Positives')
+    plt.title('Reliability Diagram')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize=(10, 5))
+    for i in range(num_classes):
+        plt.hist(y_prob[:, i], bins=n_bins, range=(0, 1), histtype='step', lw=2, label=f'Class {i}')
+    plt.xlabel('Predicted Probability')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of Predicted Probabilities')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def print_brier_score(y_true, y_prob, num_classes):
+    y_true_onehot = tf.keras.utils.to_categorical(y_true, num_classes=num_classes)
+    score = brier_score_loss(y_true_onehot.ravel(), y_prob.ravel())
+    print(f"Brier score: {score:.4f}")
+
+# Control plots
 def plot_learning_curves(history):
     # Plot accuracy
     plt.figure(figsize=(12, 4))
@@ -43,6 +92,7 @@ def plot_learning_curves(history):
     plt.legend(['Train', 'Validation'], loc='upper left')
     plt.savefig('loss.png')
 
+# Add csv files
 def addData(data, csv_file):
     noise_data = pd.read_csv(csv_file)
     return pd.concat([data, noise_data], ignore_index=True)
@@ -132,7 +182,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
 
     # Test with sample image
     sample_image = load_and_preprocess_image(file_paths[0])
-    plt.figure(figsize=(6, 6))
+    plt.figure()
     plt.imshow(sample_image)
     plt.axis('off')
     #plt.show()
@@ -295,6 +345,50 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='tfModel
     plt.title('Threshold Analysis for "Other" Class')
     plt.legend()
     plt.savefig('Threshold.png')
+
+    # Extract logits and create a new model with temperature scaling
+    logits_model = tf.keras.Model(inputs=model.input, outputs=model.layers[-1].output)
+    temperature_layer = TemperatureScaling()
+    scaled_logits = temperature_layer(logits_model.output)
+    calibrated_output = tf.keras.layers.Softmax()(scaled_logits)
+    calibrated_model = tf.keras.Model(inputs=model.input, outputs=calibrated_output)
+
+    # Compile the model for calibration
+    calibrated_model.compile(optimizer='adam', loss=nll_loss, metrics=['accuracy'])
+
+    # Train only the temperature parameter
+    calibrated_model.get_layer('temperature_scaling').trainable = True
+    for layer in calibrated_model.layers[:-2]:
+        layer.trainable = False
+
+    # Train the temperature parameter using validation data
+    calibrated_model.fit(val_dataset, epochs=1, verbose=1)
+
+    # Save the calibrated model
+    calibrated_model.save(f'{modelName}_calibrated')
+    print(f"Calibrated model saved as {modelName}_calibrated")
+
+    #
+    calibrated_model.evaluate(test_dataset)
+    print(f"Inference for example image: {example_image_file}")
+    print(f"Predictions before calibration: {predictions}")
+    predictions = calibrated_model.predict(np.expand_dims(example_image, axis=0))
+    print(f"Predictions after calibration: {predictions}")
+
+    #
+    y_prob = model.predict(val_dataset)
+    y_prob = np.array(y_prob)
+    plot_calibration_curve(y_val, y_prob, num_classes, n_bins=10)
+    print_brier_score(y_val, y_prob, num_classes)
+
+    y_prob_calibrated = calibrated_model.predict(val_dataset)
+    y_prob_calibrated = np.array(y_prob_calibrated)
+    y_val = np.concatenate([y for _, y in val_dataset], axis=0)
+    print("Shape of y_prob_calibrated:", y_prob_calibrated.shape)
+    print("Shape of y_val:", y_val.shape)
+    plot_calibration_curve(y_val, y_prob_calibrated, num_classes, n_bins=10)
+    print_brier_score(y_val, y_prob_calibrated, num_classes)
+
 
 def main():
     start_time = time.time()
