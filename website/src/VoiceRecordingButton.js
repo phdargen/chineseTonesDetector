@@ -10,6 +10,9 @@ import PlayCircleFilledRoundedIcon from '@mui/icons-material/PlayCircleFilledRou
 import ReplayCircleFilledRoundedIcon from '@mui/icons-material/ReplayCircleFilledRounded';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
+import { Link } from 'react-router-dom';
+import SchoolIcon from '@mui/icons-material/School';
+
 const convertToPinyin = require('./convertToPinyin');
 
 // API
@@ -300,10 +303,15 @@ return (
           <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Choose machine learning model </Typography>
 
           <Select value={modelType} onChange={handleModelChange} fullWidth style={{ marginTop: '16px' }} >
-            <MenuItem value="CNN">Convolutional neural network</MenuItem>
-            <MenuItem value="ViT">Fine-tuned vision transformer</MenuItem>
-            <MenuItem value="Ensemble">Ensemble</MenuItem>
+            <MenuItem value="CNN">Convolutional neural network (CNN)</MenuItem>
+            <MenuItem value="ViT">Fine-tuned vision transformer (ViT)</MenuItem>
+            <MenuItem value="Ensemble">Ensemble (CNN+ViT)</MenuItem>
           </Select>
+
+          <br />  <br />
+          <Button variant="contained" color="primary" startIcon={<SchoolIcon />} component={Link} to="/about">
+            Learn more
+         </Button>
 
           </Paper>
     </Box>

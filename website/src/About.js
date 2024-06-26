@@ -101,7 +101,7 @@ const About = () => {
           <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Mel Spectrograms</Typography>
 
           <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
-          Spectrograms are generated from sound signals using Fourier Transforms, which decompose the signal into its constituent frequencies and display the amplitude of each frequency present. 
+          Spectrograms are generated from sound signals using fourier transforms, which decompose the signal into its constituent frequencies and display the amplitude of each frequency present. 
           A mel spectrogram visually represents sound, showing how it changes over time. 
           The x-axis represents time, displaying the progression of the sound from start to finish. 
           The y-axis represents frequency (or pitch) on the mel scale, which adjusts frequencies to match how humans perceive pitch. 
@@ -142,11 +142,11 @@ const About = () => {
           <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Data set </Typography>
 
           <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
-          Pingulino's machine learning algorithms are trained using the Tone Perfect dataset from Michigan State University. 
-          This dataset includes the full catalog of monosyllabic sounds in Mandarin Chinese (410 in total) in all four tones (410 x 4 = 1,640). 
-          Spoken by six native Mandarin speakers (three female and three male), the collection is comprised of 9,840 audio files (6 sets of 1,640).
+          Pingulino's machine learning algorithms are trained using the 'Tone Perfect' dataset from Michigan State University. 
+          This dataset includes the full catalog of monosyllabic sounds in Mandarin Chinese (410 in total) in all four tones (410 x 4 = 1640). 
+          Spoken by six native Mandarin speakers (three female and three male), the collection is comprised of 9,840 audio files (6 sets of 1640) with a total duration of approximately 2 hours.
           <br /> <br />
-          [Catherine Ryu, Mandarin Tone Perception & Production Team, and Michigan State University Libraries. Tone Perfect: Multimodal Database for Mandarin Chinese. https://tone.lib.msu.edu/.]
+          [Catherine Ryu, Mandarin Tone Perception & Production Team, and Michigan State University Libraries. <a href="https://tone.lib.msu.edu/" target="_blank" rel="noopener noreferrer">Tone Perfect: Multimodal Database for Mandarin Chinese.</a> ]
           </Typography>
 
           <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
@@ -166,12 +166,32 @@ const About = () => {
       <Grid item xs={12} sm={6} >
           <Box mb={2} width={isMobile ? '100%' : '100%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Classification Models </Typography>
+
+          <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
+
+          Pingulino employs two machine learning approaches for analyzing mel spectrograms: 
+          a Convolutional Neural Network (CNN) and a fine-tuned version of Google's Vision Transformer (ViT), 
+          specifically the <a href="https://huggingface.co/google/vit-base-patch16-224" target="_blank" rel="noopener noreferrer">'vit-base-patch16-224'</a> model.
+          The CNN, inspired by the human visual cortex, excels at identifying local patterns in images. 
+          It uses sliding filters to detect features, making it efficient for straightforward tone classification.
+          In contrast, the ViT model treats images as sequences of patches, processing them similarly to text. 
+          It leverages transfer learning to capture complex, global relationships in spectrograms. 
+          </Typography>
+
+          </Paper>
+          </Box>
+      </Grid>
+
+      <Grid item xs={12} sm={6} >
+          <Box mb={2} width={isMobile ? '100%' : '100%'}>
+          <Paper elevation={3} style={{ padding: '16px' }}>
           <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Privacy Disclaimer </Typography>
 
           <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
           We use Vercel Web Analytics to collect anonymized data about your visit to our site, including pages visited, operating system, and browser. 
-          No personal information or identifiers that track users across different sites are collected or stored. 
           By using our site, you consent to this data collection.
+          No personal information or identifiers that track users across different sites are collected or stored. 
           Audio recordings are not stored and are only used for interference in our machine learning models.
           </Typography>
 
