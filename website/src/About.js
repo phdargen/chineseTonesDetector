@@ -119,7 +119,7 @@ const About = () => {
       <Grid item xs={12} sm={6} >
           <Box mb={2} width={isMobile ? '100%' : '100%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Machine learning </Typography>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Machine Learning </Typography>
 
           <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
           Pingulino provides instant visual feedback on your pronunciation by displaying the mel spectrogram of your voice recording. 
@@ -139,12 +139,12 @@ const About = () => {
       <Grid item xs={12} sm={6} >
           <Box mb={2} width={isMobile ? '100%' : '100%'}>
           <Paper elevation={3} style={{ padding: '16px' }}>
-          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Data set </Typography>
+          <Typography variant={isMobile ? 'h6' : 'h4'} style={{ fontWeight: 'bold' }}> Dataset </Typography>
 
           <Typography variant={isMobile ? 'body2' : 'body1'} style={{ marginTop: '16px' }}>
           Pingulino's machine learning algorithms are trained using the 'Tone Perfect' dataset from Michigan State University. 
-          This dataset includes the full catalog of monosyllabic sounds in Mandarin Chinese (410 in total) in all four tones (410 x 4 = 1640). 
-          Spoken by six native Mandarin speakers (three female and three male), the collection is comprised of 9,840 audio files (6 sets of 1640) with a total duration of approximately 2 hours.
+          This dataset includes the full catalog of monosyllabic sounds in Mandarin Chinese in all four tones. 
+          Spoken by six native Mandarin speakers (three female and three male), the collection is comprised of about 10k audio files with a total duration of approximately 2 hours.
           <br /> <br />
           [Catherine Ryu, Mandarin Tone Perception & Production Team, and Michigan State University Libraries. <a href="https://tone.lib.msu.edu/" target="_blank" rel="noopener noreferrer">Tone Perfect: Multimodal Database for Mandarin Chinese.</a> ]
           </Typography>
@@ -175,8 +175,10 @@ const About = () => {
           specifically the <a href="https://huggingface.co/google/vit-base-patch16-224" target="_blank" rel="noopener noreferrer">'vit-base-patch16-224'</a> model.
           The CNN, inspired by the human visual cortex, excels at identifying local patterns in images. 
           It uses sliding filters to detect features, making it efficient for straightforward tone classification.
-          In contrast, the ViT model treats images as sequences of patches, processing them similarly to text. 
+          In contrast, the ViT model treats 
+          images as sequences of patches, processing them similarly to text. 
           It leverages transfer learning to capture complex, global relationships in spectrograms. 
+          Both models achieve an accuracy of over 99.9% on a statistically independent test dataset.
           </Typography>
 
           </Paper>
