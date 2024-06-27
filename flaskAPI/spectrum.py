@@ -31,7 +31,8 @@ image_resolutionCNN = 128
 image_resolutionViT = 224
 modelNameCNN = '../trainML/tfModelTones_v5'
 modelNameViT = '../trainML/results/fineTunedModelTones_v1/'
-base_model_name = 'google/vit-base-patch16-224'
+#base_model_name = 'google/vit-base-patch16-224'
+base_model_name = 'vit-base-patch16-224' #local-version
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -52,8 +53,13 @@ bucket_folder = 'user_data'
 modelCNN = tf.keras.models.load_model(modelNameCNN)
 
 # Load ViT model
-modelViT = ViTForImageClassification.from_pretrained(modelNameViT)
-feature_extractor = ViTFeatureExtractor.from_pretrained(base_model_name)
+try:
+    modelViT = ViTForImageClassification.from_pretrained(modelNameViT)
+    feature_extractor = ViTFeatureExtractor.from_pretrained(base_model_name)
+except:
+    modelViT = None
+    feature_extractor = None
+
 try:
     calibrated_classifierViT = joblib.load("x.joblib")
 except:
@@ -245,5 +251,5 @@ def upload():
 
 if __name__ == "__main__":
     #app.run(debug=True)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)
 
