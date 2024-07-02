@@ -12,6 +12,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator, ClassifierMixin
+from peft import LoraConfig, get_peft_model
 
 import numpy as np
 import pandas as pd
@@ -119,7 +120,6 @@ class TrainingMetricsCallback(TrainerCallback):
         plt.tight_layout()
         #plt.show()
         plt.savefig('results/metrics.png')
-
 
 class ImageDataset(Dataset):
     def __init__(self, image_paths, labels, transform=None):
@@ -246,7 +246,7 @@ def print_frozen_params(model):
     print(f"Total frozen parameters: {frozen_params}")
     print(f"Total trainable parameters: {trainable_params}")
 
-def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8, addMoreLayers=False, resume_from_checkpoint=None, doCalibration=False):
+def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTunedModelTones', addNoise=False, noise_csv='noise.csv', augmentData=False, unfreezeLastBaseLayer=False, epochs=10, batch_size=8, addMoreLayers=False, resume_from_checkpoint=None, doCalibration=False, applyLora=False):
 
     # Load feature extractor
     feature_extractor = ViTFeatureExtractor.from_pretrained(model_name)
@@ -286,6 +286,17 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
     # Print parameter info
     print("\nAfter modifying requires_grad:")
     print_frozen_params(model)
+
+    # Apply Lora
+    lora_config = LoraConfig(
+        r=4,  
+        lora_alpha=32,
+        target_modules=["attention.self", "attention.output.dense"],
+        lora_dropout=0.1,
+        bias="none"
+    )
+    if applyLora:
+        model = get_peft_model(model, lora_config)
 
     # Select backend
     if torch.cuda.is_available():
@@ -577,6 +588,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=8, help="Batch size")
     parser.add_argument('--addMoreLayers', action='store_true', help="Add more layers")
     parser.add_argument('--resume_from_checkpoint', type=str, default=None, help="Path to checkpoint directory")
+    parser.add_argument('--applyLora', action='store_true', help="Apply Lora")
 
     args = parser.parse_args()
 
@@ -593,12 +605,13 @@ def main():
     print(f"Batch Size: {args.batch_size}")
     print(f"Add More Layers: {args.addMoreLayers}")
     print(f"Resume from checkpoint: {args.resume_from_checkpoint}")
+    print(f"Apply Lora: {args.applyLora}")
     print("")
 
     if args.test:
         test()
     else:
-        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size, args.addMoreLayers, args.resume_from_checkpoint)
+        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size, args.addMoreLayers, args.resume_from_checkpoint, args.applyLora)
 
     end_time = time.time()
     total_time = (end_time - start_time) / 60

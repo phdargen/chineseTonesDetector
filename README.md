@@ -62,6 +62,7 @@ python trainModel.py --addNoise --augmentData --epochs=10 --nHiddenLayers=3 --im
 ```sh
 cd trainML
 python fineTuneModel.py --addNoise --augmentData --unfreezeLastBaseLayer --epochs=10 --batch_size=64 --modelName=fineTunedModelTones_v1
+python fineTuneModel.py --addNoise --augmentData --epochs=1 --batch_size=64 --modelName=fineTunedModelTonesLora_v1 --applyLora
 ```
 
 ## ML API (local)
@@ -94,6 +95,13 @@ TMPDIR=~/tmp/ pip install tensorflow
 pip install Flask flask-cors pydub
 pip install gunicorn
 ```
+### get local copy of base ViT model
+```sh
+sudo apt-get install git-lfs
+git lfs install
+git clone https://huggingface.co/google/vit-base-patch16-224
+```
+
 ### run
 ```sh
 gunicorn --workers 3 --bind 0.0.0.0:5000 spectrum:app
