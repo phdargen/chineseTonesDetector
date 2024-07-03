@@ -39,6 +39,7 @@ pip install transformers
 pip install -U huggingface_hub
 pip install accelerate -U
 pip install tensorboard
+pip install peft
 ```
 
 ### Download data samples

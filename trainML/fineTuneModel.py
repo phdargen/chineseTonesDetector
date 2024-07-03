@@ -12,7 +12,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator, ClassifierMixin
-from peft import LoraConfig, get_peft_model
+from peft import get_peft_model, LoraConfig, TaskType
 
 import numpy as np
 import pandas as pd
@@ -233,7 +233,7 @@ def addData(data, csv_file):
     noise_data = pd.read_csv(csv_file)
     return pd.concat([data, noise_data], ignore_index=True)
 
-def print_frozen_params(model):
+def print_params(model):
     frozen_params = 0
     trainable_params = 0
     for name, param in model.named_parameters():
@@ -283,10 +283,6 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         if unfreezeLastBaseLayer and 'encoder.layer.11' in name:
             param.requires_grad = True
 
-    # Print parameter info
-    print("\nAfter modifying requires_grad:")
-    print_frozen_params(model)
-
     # Apply Lora
     lora_config = LoraConfig(
         r=4,  
@@ -296,7 +292,15 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         bias="none"
     )
     if applyLora:
+        print("\nParameters before Lora:")
+        print_params(model)
         model = get_peft_model(model, lora_config)
+        model.config.use_cache = False
+        model.config.pretraining_tp = 1
+        
+    # Print parameter info
+    print("\nParameters:")
+    print_params(model)
 
     # Select backend
     if torch.cuda.is_available():
@@ -326,7 +330,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
 
         warmup_ratio=0.1,
         lr_scheduler_type="cosine", # or linear?
-        metric_for_best_model="accuracy",
+        #metric_for_best_model="accuracy",
 
         ## Hyperparameters to tune
         per_device_train_batch_size=batch_size,   
@@ -334,6 +338,7 @@ def trainModel(csv_file='output.csv', outDir="spectrum_data", modelName='fineTun
         num_train_epochs=epochs,         
         learning_rate=1e-5,
         weight_decay=0.01,   # regularization
+        label_names=["labels"]
     )
 
     data_collator = CustomDataCollator()
@@ -588,6 +593,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=8, help="Batch size")
     parser.add_argument('--addMoreLayers', action='store_true', help="Add more layers")
     parser.add_argument('--resume_from_checkpoint', type=str, default=None, help="Path to checkpoint directory")
+    parser.add_argument('--doCalibration', action='store_true', help="Do prob calibration")
     parser.add_argument('--applyLora', action='store_true', help="Apply Lora")
 
     args = parser.parse_args()
@@ -603,15 +609,16 @@ def main():
     print(f"Unfreeze Last Base Layer: {args.unfreezeLastBaseLayer}")
     print(f"Epochs: {args.epochs}")
     print(f"Batch Size: {args.batch_size}")
-    print(f"Add More Layers: {args.addMoreLayers}")
+    print(f"Add More Layers: {args.addMoreLayers}") 
     print(f"Resume from checkpoint: {args.resume_from_checkpoint}")
+    print(f"Do prob calibration: {args.doCalibration}")
     print(f"Apply Lora: {args.applyLora}")
     print("")
 
     if args.test:
         test()
     else:
-        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size, args.addMoreLayers, args.resume_from_checkpoint, args.applyLora)
+        trainModel(args.csv_file, args.outDir, args.modelName, args.addNoise, args.noise_csv_file, args.augmentData, args.unfreezeLastBaseLayer, args.epochs, args.batch_size, args.addMoreLayers, args.resume_from_checkpoint, args.doCalibration, args.applyLora)
 
     end_time = time.time()
     total_time = (end_time - start_time) / 60
