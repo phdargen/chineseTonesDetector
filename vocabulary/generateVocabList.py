@@ -33,12 +33,29 @@ def translate_text(text, model, tokenizer):
     translated = model.generate(**inputs)
     return tokenizer.decode(translated[0], skip_special_tokens=True)
 
-def generate_sentence(word, model, tokenizer):
-    prompt = "" #f"使用"{word}"造一个日常对话中的句子："
-    inputs = tokenizer(prompt, return_tensors="pt", max_length=50, truncation=True)
-    outputs = model.generate(**inputs, max_length=100, num_return_sequences=1, do_sample=True, top_p=0.95, top_k=50)
-    sentence = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return sentence.split("：")[-1].strip()  
+def generate_sentence(word):
+    try:
+        model = AutoModelForSeq2SeqLM.from_pretrained("uer/t5-base-chinese-cluecorpussmall")
+        tokenizer = AutoTokenizer.from_pretrained("uer/t5-base-chinese-cluecorpussmall")
+        
+        prompt = f"使用\"{word}\"造一个日常对话中的句子："
+        inputs = tokenizer(prompt, return_tensors="pt", max_length=50, truncation=True)
+        
+        # Remove token_type_ids if present
+        if 'token_type_ids' in inputs:
+            del inputs['token_type_ids']
+        
+        outputs = model.generate(**inputs, max_length=100, num_return_sequences=1, do_sample=True, top_p=0.95, top_k=50)
+        sentence = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        # Ensure the target word is in the sentence
+        if word not in sentence:
+            sentence = f"{sentence} {word}。"
+        
+        return sentence.strip()
+    except Exception as e:
+        print(f"Error generating sentence: {str(e)}")
+        return f"这是一个使用\"{word}\"的例句。" 
 
 def generate_audio(text, model, tokenizer):
     inputs = tokenizer(text, return_tensors="pt")
@@ -50,10 +67,7 @@ def add_info_and_generate_audio(words):
     print("Loading models...")
     translation_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-zh-en")
     translation_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-zh-en")
-    
-    sentence_model = AutoModelForSeq2SeqLM.from_pretrained("bert-base-chinese")
-    sentence_tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese")
-    
+
     #tts_model = VitsModel.from_pretrained("espnet/kan-bayashi_ljspeech_vits")
     #tts_tokenizer = VitsTokenizer.from_pretrained("espnet/kan-bayashi_ljspeech_vits")
 
@@ -62,11 +76,11 @@ def add_info_and_generate_audio(words):
         print(f"Processing word {i}/{len(words)}: {word}")
         py = ' '.join([p[0] for p in pinyin(word, style=Style.NORMAL)])
         en = translate_text(word, translation_model, translation_tokenizer)
-        sentence = generate_sentence(word, sentence_model, sentence_tokenizer)
+        sentence = generate_sentence(word)
         #word_audio = generate_audio(word, tts_model, tts_tokenizer)
         #sentence_audio = generate_audio(sentence, tts_model, tts_tokenizer)
         
-        word_info.append((word, py, en, sentence))
+        word_info.append((word, py, en, sentence, 0, 0))
     
     return word_info
 
