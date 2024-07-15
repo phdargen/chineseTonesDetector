@@ -1,3 +1,5 @@
+import os
+import argparse
 import torch
 from transformers import (
     BertTokenizer, BertModel, 
@@ -10,7 +12,10 @@ import genanki
 import random
 import soundfile as sf
 import io
-
+import requests
+from openai import OpenAI
+client = OpenAI()
+    
 def get_common_chinese_words(num_words=1000):
     tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
     model = BertModel.from_pretrained('bert-base-chinese')
@@ -32,6 +37,16 @@ def translate_text(text, model, tokenizer):
     inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
     translated = model.generate(**inputs)
     return tokenizer.decode(translated[0], skip_special_tokens=True)
+
+def translate_text_chatgpt(text):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a translator. Translate the following Chinese text to English."},
+            {"role": "user", "content": text}
+        ]
+    )
+    return response.choices[0].message.content
 
 def generate_sentence(word):
     try:
@@ -57,30 +72,58 @@ def generate_sentence(word):
         print(f"Error generating sentence: {str(e)}")
         return f"这是一个使用\"{word}\"的例句。" 
 
+def generate_sentence_chatgpt(word):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a Chinese language assistant. Create a simple sentence using the given word."},
+            {"role": "user", "content": f"Create a simple Chinese sentence using the word '{word}'."}
+        ]
+    )
+    return response.choices[0].message.content
+
 def generate_audio(text, model, tokenizer):
     inputs = tokenizer(text, return_tensors="pt")
     with torch.no_grad():
         audio = model(**inputs).waveform
     return audio.squeeze().numpy()
 
-def add_info_and_generate_audio(words):
-    print("Loading models...")
-    translation_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-zh-en")
-    translation_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-zh-en")
+def generate_audio_chatgpt(text,filename):
+    response = client.audio.speech.create(
+        model="tts-1", #"tts-1-hd"
+        voice="nova",
+        input=text
+    ) 
+    response.stream_to_file(filename)
+    return filename
 
-    #tts_model = VitsModel.from_pretrained("espnet/kan-bayashi_ljspeech_vits")
-    #tts_tokenizer = VitsTokenizer.from_pretrained("espnet/kan-bayashi_ljspeech_vits")
+def add_info_and_generate_audio(words, useChatGPT = False):
+
+    if not useChatGPT:
+        print("Loading models...")
+        translation_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-zh-en")
+        translation_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-zh-en")
+
+        #tts_model = VitsModel.from_pretrained("espnet/kan-bayashi_ljspeech_vits")
+        #tts_tokenizer = VitsTokenizer.from_pretrained("espnet/kan-bayashi_ljspeech_vits")
 
     word_info = []
     for i, word in enumerate(words, 1):
         print(f"Processing word {i}/{len(words)}: {word}")
         py = ' '.join([p[0] for p in pinyin(word, style=Style.NORMAL)])
-        en = translate_text(word, translation_model, translation_tokenizer)
-        sentence = generate_sentence(word)
-        #word_audio = generate_audio(word, tts_model, tts_tokenizer)
-        #sentence_audio = generate_audio(sentence, tts_model, tts_tokenizer)
+
+        if useChatGPT:
+            en = translate_text_chatgpt(word)
+            sentence = generate_sentence_chatgpt(word)
+            word_audio = generate_audio_chatgpt(word,f"audio/word_{i}.wav")
+            sentence_audio = generate_audio_chatgpt(sentence,f"audio/sentence_{i}.wav")
+        else:
+            en = translate_text(word, translation_model, translation_tokenizer)
+            sentence = generate_sentence(word)
+            word_audio = None
+            sentence_audio = None
         
-        word_info.append((word, py, en, sentence, 0, 0))
+        word_info.append((word, py, en, sentence, word_audio, sentence_audio))
     
     return word_info
 
@@ -114,39 +157,39 @@ def create_anki_deck(word_info):
     deck = genanki.Deck(deck_id, 'Common Chinese Words')
 
     for word, pinyin, english, sentence, word_audio, sentence_audio in word_info:
-        word_audio_filename = f"{word}_audio.wav"
-        sentence_audio_filename = f"{word}_sentence_audio.wav"
-        
-        sf.write(word_audio_filename, word_audio, samplerate=22050)
-        sf.write(sentence_audio_filename, sentence_audio, samplerate=22050)
-        
         note = genanki.Note(
             model=model,
             fields=[word, pinyin, english, sentence, 
-                    f'[sound:{word_audio_filename}]',
-                    f'[sound:{sentence_audio_filename}]']
+                    f'[sound:{word_audio}]',
+                    f'[sound:{sentence_audio}]']
         )
         deck.add_note(note)
 
     package = genanki.Package(deck)
-    package.media_files = [f"{word}_audio.wav" for word, _, _, _, _, _ in word_info] + \
-                          [f"{word}_sentence_audio.wav" for word, _, _, _, _, _ in word_info]
+    #package.media_files = [f"{word}_audio.wav" for word, _, _, _, _, _ in word_info] + \
+     #                     [f"{word}_sentence_audio.wav" for word, _, _, _, _, _ in word_info]
     package.write_to_file('common_chinese_words.apkg')
 
 def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--useChatGPT', action='store_true', help="Use ChatGPT API")
+    args = parser.parse_args()
+    print("Settings: ")
+    print(f"Use ChatGPT API: {args.useChatGPT}")
+
     print("Fetching common Chinese words...")
-    common_words = get_common_chinese_words(10) 
+    common_words = get_common_chinese_words(3) 
     print(common_words)
     for word in common_words:
         print(f"{word}")
 
     print("Adding translations, generating sentences and audio...")
-    word_info = add_info_and_generate_audio(common_words)
+    word_info = add_info_and_generate_audio(common_words, args.useChatGPT)
     
-    # print("Creating Anki deck...")
-    # create_anki_deck(word_info)
-    
-    # print("Anki deck 'common_chinese_words.apkg' has been created.")
+    print("Creating Anki deck...")
+    create_anki_deck(word_info)
+    print("Anki deck 'common_chinese_words.apkg' has been created.")
     
     print("\nSample of the word list:")
     for word, py, en, sentence, _, _ in word_info[:5]:
