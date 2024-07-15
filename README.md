@@ -109,6 +109,12 @@ git clone https://huggingface.co/google/vit-base-patch16-224
 gunicorn --workers 3 --bind 0.0.0.0:5000 spectrum:app
 ```
 
+## Generate vocabulary list for anki
+```sh
+pip install pypinyin genanki sentencepiece openai
+```
+
+
 ## Website
 
 ### setup environment
