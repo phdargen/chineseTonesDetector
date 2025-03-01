@@ -42,7 +42,7 @@ def translate_text_chatgpt(text):
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a translator. Translate the following Chinese text to English."},
+            {"role": "system", "content": "You are a translator. Translate the following Chinese text to English. The text is intended for flash cards. "},
             {"role": "user", "content": text}
         ]
     )
@@ -90,7 +90,7 @@ def generate_audio(text, model, tokenizer):
 
 def generate_audio_chatgpt(text,filename):
     response = client.audio.speech.create(
-        model="tts-1", #"tts-1-hd"
+        model="tts-1-hd", #"tts-1-hd"
         voice="nova",
         input=text
     ) 
@@ -110,7 +110,7 @@ def add_info_and_generate_audio(words, useChatGPT = False):
     word_info = []
     for i, word in enumerate(words, 1):
         print(f"Processing word {i}/{len(words)}: {word}")
-        py = ' '.join([p[0] for p in pinyin(word, style=Style.NORMAL)])
+        py = ' '.join([p[0] for p in pinyin(word)])
 
         if useChatGPT:
             en = translate_text_chatgpt(word)
@@ -123,7 +123,9 @@ def add_info_and_generate_audio(words, useChatGPT = False):
             word_audio = None
             sentence_audio = None
         
-        word_info.append((word, py, en, sentence, word_audio, sentence_audio))
+        py_sentence = ' '.join([p[0] for p in pinyin(sentence)])
+
+        word_info.append((word, py, en, sentence, py_sentence, word_audio, sentence_audio))
     
     return word_info
 
@@ -156,7 +158,7 @@ def create_anki_deck(word_info):
     deck_id = random.randrange(1 << 30, 1 << 31)
     deck = genanki.Deck(deck_id, 'Common Chinese Words')
 
-    for word, pinyin, english, sentence, word_audio, sentence_audio in word_info:
+    for word, pinyin, english, sentence, py_sentence, word_audio, sentence_audio in word_info:
         note = genanki.Note(
             model=model,
             fields=[word, pinyin, english, sentence, 
@@ -179,7 +181,7 @@ def main():
     print(f"Use ChatGPT API: {args.useChatGPT}")
 
     print("Fetching common Chinese words...")
-    common_words = get_common_chinese_words(3) 
+    common_words = get_common_chinese_words(10) 
     print(common_words)
     for word in common_words:
         print(f"{word}")
@@ -192,9 +194,10 @@ def main():
     print("Anki deck 'common_chinese_words.apkg' has been created.")
     
     print("\nSample of the word list:")
-    for word, py, en, sentence, _, _ in word_info[:5]:
+    for word, py, en, sentence, py_sentence, _, _ in word_info:
          print(f"{word} ({py}): {en}")
          print(f"Example: {sentence}\n")
+         print(f"{py_sentence}\n")
 
 if __name__ == "__main__":
     main()
